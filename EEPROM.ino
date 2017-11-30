@@ -114,7 +114,7 @@ boolean checkEEPROMPWM()
   int val;
   EEPROM.begin(512);
   val = EEPROM.read(500);
-  if(val == numCh){return true;}else {return false;}
   EEPROM.end();
+  if(val == numCh){return true;}else {return false;}
 }
 
