@@ -1,10 +1,3 @@
-/**************************************************************
-
-   PCA9685 DIMMING CODE WITH 6 CHANNELS.
-   Original code written by O2Surplus, modified by MrMan @ plantedtank.net
-
- **************************************************************/
-
 #include <FS.h>                   // https://github.com/tzapu/WiFiManager This Library needs to be included FIRST!
 #define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
 #include <BlynkSimpleEsp8266.h>
@@ -45,9 +38,9 @@ bool isFirstConnect = true;
 char Date[16];
 char Time[16];
 unsigned long startsecond = 0;        // time for LEDs to ramp to full brightness
-unsigned long stopsecond = 0;         // time for LEDs to ramp to dim level from full brightness
+unsigned long stopsecond = 0;         // finish time for LEDs to ramp to dim level from full brightness
 unsigned long sunriseSecond = 0;      // time for LEDs to start ramping to dim level
-unsigned long sunsetSecond = 0;       // time for LEDs to dim off
+unsigned long sunsetSecond = 0;       // finish time for LEDs to dim off
 unsigned long nowseconds = 0;         // time  now  in seconds
 
 boolean fadeInProgress = false;
@@ -82,8 +75,9 @@ OneWire oneWire(ONE_WIRE_BUS);
 // Pass our oneWire reference to Dallas Temperature. 
 DallasTemperature sensors(&oneWire);
 
-// arrays to hold device addresses
-DeviceAddress tempSensor1, tempSensor2;
+// array to hold device addresses (can increase array length if using more sensors)
+DeviceAddress tempSensors[5];
+int numTempSensors;
 
 int fanOnTemp = 0;
 
@@ -141,6 +135,9 @@ BLYNK_WRITE(V5) {// slider widget to set the maximum led level from the Blynk Ap
     pwm.setPWM(5, 0, LEDsettings[5].tempPWM);
   }
 }
+/*
+ * Can uncomment and add widgets to Blynk for additional channel control, make sure to update numCh variable
+ * 
 BLYNK_WRITE(V6) {// slider widget to set the maximum led level from the Blynk App.
   int value = param.asInt();
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
@@ -156,43 +153,85 @@ BLYNK_WRITE(V7) {// slider widget to set the maximum led level from the Blynk Ap
     LEDsettings[7].tempPWM = value;
     pwm.setPWM(7, 0, LEDsettings[7].tempPWM);
   }
-}
+}*/
 
+
+BLYNK_WRITE(V10) //Blynk pin for sunrise/sunset time (time LEDs start turning on / hit moon values)
+{
+  TimeInputParam t(param);
+  sunriseSecond = (t.getStartHour() * 3600) + (t.getStartMinute() * 60);
+  sunsetSecond = (((t.getStopHour() * 3600) + (t.getStopMinute() * 60) - fadeTimeSeconds) + 86400) % 86400;
+
+  sprintf(Time, "%02d:%02d:%02d", t.getStartHour(), t.getStartMinute(), 0);
+  Serial.print("Sunrise time is: ");
+  Serial.println(Time);
+  sprintf(Time, "%02d:%02d:%02d", t.getStopHour(), t.getStopMinute(), 0);
+  Serial.print("Sunset time is: ");
+  Serial.println(Time);
+}
+BLYNK_WRITE(V11) //Blynk pin for daylight start/stop time
+{
+  TimeInputParam t(param);
+  startsecond = (t.getStartHour() * 3600) + (t.getStartMinute() * 60);
+  stopsecond = (((t.getStopHour() * 3600) + (t.getStopMinute() * 60) - fadeTimeSeconds) + 86400) % 86400;
+
+  sprintf(Time, "%02d:%02d:%02d", t.getStartHour(), t.getStartMinute(), 0);
+  Serial.print("Daylight start time is: ");
+  Serial.println(Time);
+  sprintf(Time, "%02d:%02d:%02d", t.getStopHour(), t.getStopMinute(), 0);
+  Serial.print("Daylight stop time is: ");
+  Serial.println(Time);
+  
+  if(startsecond < (sunriseSecond + fadeTimeSeconds))
+  {
+    //ramp to full brightness starting before sunrise finished
+    Blynk.notify("Sunrise plus ramp time should be earlier than Daylight start time");
+  }
+  if(stopsecond > (sunsetSecond - fadeTimeSeconds))
+  {
+    //ramp to moonlight starting before ramp to sunset finished
+    Blynk.notify("Daylight stop time should be earlier than sunset time (note: ramp finishes at sunset time)");
+  }
+}
+BLYNK_WRITE(V12) // slider widget to set the led fade duration up tp 3 hours.
+{
+  int value = param.asInt();
+  fadeTimeSeconds = map(value, 0, 180, 1, 10800);// 3 hour fade duration is max
+  fadeTimeMillis  = map(value, 0, 180, 1, 10800000);// 3 hour fade duration is max
+
+  Serial.print("Fade Time in seconds =");
+  Serial.println(fadeTimeSeconds);
+}
 BLYNK_WRITE(V15) {// menu input to select LED mode
   LEDMode = param.asInt();
   nowseconds = ((hour() * 3600) + (minute() * 60) + second());
   int i;
-  if(LEDMode == 1)
+  if(LEDMode == 1) //normal operation
   {
-    /*
-      unsigned long startsecond = 0;        // time for LEDs to ramp to full brightness
-      unsigned long stopsecond = 0;         // time for LEDs to ramp to dim level from full brightness
-      unsigned long sunriseSecond = 0;      // time for LEDs to start ramping to dim level
-      unsigned long sunsetSecond = 0;       // time for LEDs to dim off
-     */
-     fadeInProgress=false;
-     if(nowseconds < sunriseSecond)
-     {
-       //moonlight
-       for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].moonPWM;}
-     }else if(sunriseSecond < nowseconds < startsecond)
-     {
-       //sunrise 
-       for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].dimPWM;}
-     }else if(startsecond < nowseconds < stopsecond)
-     {
-       //daylight
-       for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].maxPWM;}
-     }else if(stopsecond < nowseconds < sunsetSecond)
-     {
-       //sunset
-       for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].dimPWM;}
-     }else if(sunsetSecond < nowseconds)
-     {
-       //moonlight
-       for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].moonPWM;}
-     }
-     writeLEDs();
+    fadeInProgress=false;
+    if(nowseconds < sunriseSecond)
+    {
+      //moonlight
+      for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].moonPWM;}
+    }else if(sunriseSecond < nowseconds < startsecond)
+    {
+      //sunrise 
+      for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].dimPWM;}
+    }else if(startsecond < nowseconds < stopsecond)
+    {
+      //daylight
+      for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].maxPWM;}
+    }else if(stopsecond < nowseconds < sunsetSecond)
+    {
+      //sunset
+      for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].dimPWM;}
+    }else if(sunsetSecond < nowseconds)
+    {
+      //moonlight
+      for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].moonPWM;}
+    }
+    //Write current values to LEDs
+    writeLEDs();
   }
   if(LEDMode == 2)
   {
@@ -247,41 +286,6 @@ BLYNK_WRITE(V16) {// Save button for LED settings
   {
     saveMoonPWMValues();
   }
-}
-BLYNK_WRITE(V10) //Blynk pin for sunrise/sunset time
-{
-  TimeInputParam t(param);
-  sunriseSecond = (t.getStartHour() * 3600) + (t.getStartMinute() * 60);
-  sunsetSecond = (t.getStopHour() * 3600) + (t.getStopMinute() * 60);
-
-  sprintf(Time, "%02d:%02d:%02d", t.getStartHour(), t.getStartMinute(), 0);
-  Serial.print("Sunrise time is: ");
-  Serial.println(Time);
-  sprintf(Time, "%02d:%02d:%02d", t.getStopHour(), t.getStopMinute(), 0);
-  Serial.print("Sunset time is: ");
-  Serial.println(Time);
-}
-BLYNK_WRITE(V11) //Blynk pin for daylight start/stop time
-{
-  TimeInputParam t(param);
-  startsecond = (t.getStartHour() * 3600) + (t.getStartMinute() * 60);
-  stopsecond = (t.getStopHour() * 3600) + (t.getStopMinute() * 60);
-
-  sprintf(Time, "%02d:%02d:%02d", t.getStartHour(), t.getStartMinute(), 0);
-  Serial.print("Daylight start time is: ");
-  Serial.println(Time);
-  sprintf(Time, "%02d:%02d:%02d", t.getStopHour(), t.getStopMinute(), 0);
-  Serial.print("Daylight stop time is: ");
-  Serial.println(Time);
-}
-BLYNK_WRITE(V12) // slider widget to set the led fade duration up tp 3 hours.
-{
-  int value = param.asInt();
-  fadeTimeSeconds = map(value, 0, 180, 1, 10800);// 3 hour fade duration is max
-  fadeTimeMillis  = map(value, 0, 180, 1, 10800000);// 3 hour fade duration is max
-
-  Serial.print("Fade Time in seconds =");
-  Serial.println(fadeTimeSeconds);
 }
 BLYNK_WRITE(V22) {
   fanOnTemp = param.asInt();
@@ -447,24 +451,21 @@ void reconnectBlynk() {
 
 void checkTemp()
 {
+  //read all sensors and keep track of maximum temperature
   sensors.requestTemperatures();
-  float temp1 = sensors.getTempC(tempSensor1);
-  float temp2 = sensors.getTempC(tempSensor2);
-  int intTemp; //temp as integer
-  float maxTemp; //maximum temperature as float
-  if( temp1 > temp2)
+  float temperature[numTempSensors];
+  float maxTemperature = 0.0;
+  for(int i; i < numTempSensors ; i++)
   {
-    intTemp=temp1;
-    maxTemp=temp1;
+    temperature[i] = sensors.getTempC(tempSensors[i]);
+    if(temperature[i] > maxTemperature)maxTemperature=temperature[i];
   }
-  if( temp1 < temp2)
-  {
-    intTemp=temp2;
-    maxTemp=temp2;
-  }
-  //blynk write
-  Blynk.virtualWrite(V20, maxTemp);
-  //if higher than fan set temp turn fan on
+  
+  //write the maximum temperature to Blynk
+  Blynk.virtualWrite(V20, maxTemperature);
+  
+  //if higher than fan set temperature then turn fan on
+  int intTemp = maxTemperature; //temp as integer
   if(intTemp > fanOnTemp)
   {
     //Calculate PWM by temp over fanOnTemp, at 0C above run at 10%, 20C above 100%
@@ -509,11 +510,18 @@ void setup()
   //Start dallas temperature temp sensors
   sensors.begin();
   // locate devices on the bus
+  numTempSensors = sensors.getDeviceCount();
   Serial.print("Found ");
-  Serial.print(sensors.getDeviceCount(), DEC);
+  Serial.print(numTempSensors);
   Serial.println(" temperature devices.");
-  if (!sensors.getAddress(tempSensor1, 0)) Serial.println("Unable to find address for Device 0"); 
-  if (!sensors.getAddress(tempSensor2, 1)) Serial.println("Unable to find address for Device 1"); 
+  for( int i = 0 ; i < numTempSensors ; i++)
+  {
+    if (!sensors.getAddress(tempSensors[i], i))
+    {
+      Serial.print("Unable to find address for Device "); 
+      Serial.println(i);
+    }
+  }
 
   //The following code is borrowed from WiFiManager
   //clean FS, for testing
@@ -640,10 +648,11 @@ void setup()
   readPWMValues();
 
   Blynk.virtualWrite(V15,1); //Ensure mode is set to normal at startup
+  Blynk.syncVirtual(V12);//check fade time before schedule so we can check for ramp collisions
+  Blynk.syncVirtual(V10,V11,V22); //Read start/stop/sunrise/sunset times, fade duration, fan on temp
+  Blynk.syncVirtual(V15);//make sure we have schedule loaded before starting normal operation
   
-  Blynk.syncVirtual(V10,V11,V12,V15,V22); //Read start/stop/sunrise/sunset times, fade duration, fan on temp
-  
-  timer.setInterval(250L, ledFade);           // adjust the led lighting every 250ms
+  timer.setInterval(500L, ledFade);           // adjust the led lighting every 500ms
   timer.setInterval(1000L, checkSchedule);    // check every second if fade should start
   timer.setInterval(10000L, checkTemp);       // check heatsink temperature every 10 seconds
   timer.setInterval(60000L, reconnectBlynk);  // check every 60s if still connected to server
