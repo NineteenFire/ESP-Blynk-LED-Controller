@@ -159,29 +159,59 @@ BLYNK_WRITE(V7) {// slider widget to set the maximum led level from the Blynk Ap
 BLYNK_WRITE(V10) //Blynk pin for sunrise/sunset time (time LEDs start turning on / hit moon values)
 {
   TimeInputParam t(param);
-  sunriseSecond = (t.getStartHour() * 3600) + (t.getStartMinute() * 60);
-  sunsetSecond = (((t.getStopHour() * 3600) + (t.getStopMinute() * 60) - fadeTimeSeconds) + 86400) % 86400;
 
-  sprintf(Time, "%02d:%02d:%02d", t.getStartHour(), t.getStartMinute(), 0);
+  if (t.hasStartTime())
+  {
+    sunriseSecond = (t.getStartHour() * 3600) + (t.getStartMinute() * 60);
+  }else
+  {
+    //if start time is not set assume 8AM
+    sunriseSecond = 28800;
+  }
+  if (t.hasStopTime())
+  {
+    sunsetSecond = ((t.getStopHour() * 3600) + (t.getStopMinute() * 60) - fadeTimeSeconds + 86400) % 86400;
+  }else
+  {
+    //if stop time is not set assume 8PM
+    sunsetSecond = 72000;
+  }
+
+  sprintf(Time, "%02d:%02d:%02d", sunriseSecond/3600 , (sunriseSecond % 60) * 60, 0);
   Serial.print("Sunrise time is: ");
   Serial.println(Time);
-  sprintf(Time, "%02d:%02d:%02d", t.getStopHour(), t.getStopMinute(), 0);
+  sprintf(Time, "%02d:%02d:%02d", sunsetSecond/3600 , (sunsetSecond % 60) * 60, 0);
   Serial.print("Sunset time is: ");
   Serial.println(Time);
 }
 BLYNK_WRITE(V11) //Blynk pin for daylight start/stop time
 {
   TimeInputParam t(param);
-  startsecond = (t.getStartHour() * 3600) + (t.getStartMinute() * 60);
-  stopsecond = (((t.getStopHour() * 3600) + (t.getStopMinute() * 60) - fadeTimeSeconds) + 86400) % 86400;
-
-  sprintf(Time, "%02d:%02d:%02d", t.getStartHour(), t.getStartMinute(), 0);
+  
+  if (t.hasStartTime())
+  {
+    startsecond = (t.getStartHour() * 3600) + (t.getStartMinute() * 60);
+  }else
+  {
+    //if start time is not set assume noon
+    startsecond = 43200;
+  }
+  if (t.hasStopTime())
+  {
+    stopsecond = ((t.getStopHour() * 3600) + (t.getStopMinute() * 60) - fadeTimeSeconds + 86400) % 86400;
+  }else
+  {
+    //if stop time is not set assume 4PM
+    stopsecond = 57600;
+  }
+  
+  sprintf(Time, "%02d:%02d:%02d", startsecond/3600 , (startsecond % 60) * 60, 0);
   Serial.print("Daylight start time is: ");
   Serial.println(Time);
-  sprintf(Time, "%02d:%02d:%02d", t.getStopHour(), t.getStopMinute(), 0);
+  sprintf(Time, "%02d:%02d:%02d", stopsecond/3600 , (stopsecond % 60) * 60, 0);
   Serial.print("Daylight stop time is: ");
   Serial.println(Time);
-  
+  /*
   if(startsecond < (sunriseSecond + fadeTimeSeconds))
   {
     //ramp to full brightness starting before sunrise finished
@@ -191,43 +221,48 @@ BLYNK_WRITE(V11) //Blynk pin for daylight start/stop time
   {
     //ramp to moonlight starting before ramp to sunset finished
     Blynk.notify("Daylight stop time should be earlier than sunset time (note: ramp finishes at sunset time)");
-  }
+  }*/
 }
 BLYNK_WRITE(V12) // slider widget to set the led fade duration up tp 3 hours.
 {
   int value = param.asInt();
-  fadeTimeSeconds = map(value, 0, 180, 1, 10800);// 3 hour fade duration is max
-  fadeTimeMillis  = map(value, 0, 180, 1, 10800000);// 3 hour fade duration is max
+  fadeTimeSeconds = map(value, 0, 180, 60, 10800);      // 1 minute fade duration is minimum
+  fadeTimeMillis  = map(value, 0, 180, 60000, 10800000);// 3 hour fade duration is maximum
 
-  Serial.print("Fade Time in seconds =");
+  Serial.print("Fade Time in seconds: ");
   Serial.println(fadeTimeSeconds);
 }
 BLYNK_WRITE(V15) {// menu input to select LED mode
   LEDMode = param.asInt();
-  nowseconds = ((hour() * 3600) + (minute() * 60) + second());
   int i;
   if(LEDMode == 1) //normal operation
   {
+    nowseconds = ((hour() * 3600) + (minute() * 60) + second());
     fadeInProgress=false;
     if(nowseconds < sunriseSecond)
     {
       //moonlight
+      Serial.println("Setting lights to moonlight mode based on current time...");
       for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].moonPWM;}
     }else if(sunriseSecond < nowseconds < startsecond)
     {
       //sunrise 
+      Serial.println("Setting lights to sunrise mode based on current time...");
       for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].dimPWM;}
     }else if(startsecond < nowseconds < stopsecond)
     {
       //daylight
+      Serial.println("Setting lights to daylight mode based on current time...");
       for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].maxPWM;}
     }else if(stopsecond < nowseconds < sunsetSecond)
     {
       //sunset
+      Serial.println("Setting lights to sunset mode based on current time...");
       for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].dimPWM;}
     }else if(sunsetSecond < nowseconds)
     {
       //moonlight
+      Serial.println("Setting lights to moonlight mode based on current time...");
       for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].moonPWM;}
     }
     //Write current values to LEDs
