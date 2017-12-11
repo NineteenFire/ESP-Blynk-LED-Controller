@@ -18,7 +18,7 @@
 
 byte pSDA=4;
 byte pSCL=5;
-byte pEnFAN=2;
+byte pEnFAN=16;
 byte pFANPWM=0;
 byte pOneWire=13;
 
@@ -95,7 +95,7 @@ void setup()
   pinMode(BUILTIN_LED, OUTPUT);
   pinMode(pFANPWM, OUTPUT);
   pinMode(pEnFAN, OUTPUT);
-  digitalWrite(BUILTIN_LED, HIGH);
+  digitalWrite(BUILTIN_LED, LOW);
   digitalWrite(pFANPWM, LOW);
   digitalWrite(pEnFAN, LOW);
   
@@ -257,7 +257,7 @@ void setup()
   timer.setInterval(10000L, checkTemp);       // check heatsink temperature every 10 seconds
   timer.setInterval(60000L, reconnectBlynk);  // check every 60s if still connected to server
 
-  digitalWrite(BUILTIN_LED, LOW); //ensure light is OFF
+  digitalWrite(BUILTIN_LED, HIGH); //ensure light is OFF
   Blynk.notify("LED Controller ONLINE");
   Serial.println("End of startup.");
 }
@@ -275,10 +275,10 @@ void loop()
 void reconnectBlynk() {
   if (!Blynk.connected())
   {
-    digitalWrite(BUILTIN_LED, HIGH);
+    digitalWrite(BUILTIN_LED, LOW);
     if (Blynk.connect())
     {
-      digitalWrite(BUILTIN_LED, LOW);
+      digitalWrite(BUILTIN_LED, HIGH);
       BLYNK_LOG("Reconnected");
     }
     else {
@@ -287,7 +287,7 @@ void reconnectBlynk() {
     }
   }else
   {
-    digitalWrite(BUILTIN_LED, LOW);
+    digitalWrite(BUILTIN_LED, HIGH);
   }
   //Print LED values to serial once per minute for debugging
   String currentTime = String(hour()) + ":" + minute() + ":" + second();
@@ -395,6 +395,12 @@ void ledFade() {
         //value decreasing
         LEDsettings[i].currentPWM = LEDsettings[i].lastPWM - (timeElapsed / LEDsettings[i].fadeIncrementTime);
       }
+      //if target == last set to target
+      if(LEDsettings[i].lastPWM == LEDsettings[i].targetPWM)
+      {
+        //value decreasing
+        LEDsettings[i].currentPWM = LEDsettings[i].targetPWM;
+      }
       LEDsettings[i].currentPWM = constrain(LEDsettings[i].currentPWM,0,4095);
     }
     if(now() > (fadeStartTimeSeconds + fadeTimeSeconds))
@@ -472,12 +478,6 @@ void checkTemp()
     digitalWrite(pEnFAN,LOW);
     analogWrite(pFANPWM,0);
   }
-}
-
-void flip()
-{
-  int state = digitalRead(BUILTIN_LED);  // get the current state of GPIO1 pin
-  digitalWrite(BUILTIN_LED, !state);     // set pin to the opposite state
 }
 
 void smartLEDStartup()
