@@ -36,15 +36,16 @@ void saveConfigCallback () {
 bool isFirstConnect = true;
 bool smartStartupRun = false;
 
-char Date[16];
 char Time[16];
+
 unsigned long startsecond = 43200;        // time for LEDs to ramp to full brightness
 unsigned long stopsecond = 64800;         // finish time for LEDs to ramp to dim level from full brightness
 unsigned long sunriseSecond = 28800;      // time for LEDs to start ramping to dim level
 unsigned long sunsetSecond = 79200;       // finish time for LEDs to dim off
 unsigned long nowseconds = 0;         // time  now  in seconds
 
-boolean fadeInProgress = false;
+//0=not ramping, 3=moon->dim, 4=dim->max, 5=max->dim, 6=dim->moon
+unsigned int fadeInProgress = 0;
 unsigned long fadeStartTimeMillis = 0;
 unsigned long fadeStartTimeSeconds = 0;
 unsigned long fadeTimeSeconds = 3600;
@@ -226,9 +227,6 @@ void setup()
     // Wait until connected
   }
   rtc.begin();
-  Blynk.run();
-  delay(500); //make sure enough time to sync time before changing sync interval
-  Blynk.run();
   
   //Blynk.setProperty(V0, "color", "#F2FAFF"); // COOL WHITE
   //Blynk.setProperty(V1, "color", "#FFEDE0"); // WARM WHITE
@@ -246,11 +244,6 @@ void setup()
     clearPWMValues();
   }
   readPWMValues();
-
-  String currentTime = String(hour()) + ":" + minute() + ":" + second();
-  Serial.print("Time: ");
-  Serial.println(currentTime);
-  setSyncInterval(600000); //set time sync to every 10 minutes
   
   timer.setInterval(500L, ledFade);           // adjust the led lighting every 500ms
   timer.setInterval(1000L, checkSchedule);    // check every second if fade should start
@@ -290,42 +283,45 @@ void reconnectBlynk() {
     digitalWrite(BUILTIN_LED, HIGH);
   }
   //Print LED values to serial once per minute for debugging
-  String currentTime = String(hour()) + ":" + minute() + ":" + second();
-  nowseconds = ((hour() * 3600) + (minute() * 60) + second());
+  sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
   Serial.print("Time: ");
-  Serial.print(currentTime);
+  Serial.print(Time);
   Serial.print("\tLEDs: ");
   for (int i = 0; i < numCh; i = i + 1) {
         Serial.print(LEDsettings[i].currentPWM);
-        if(i != numCh)Serial.print(", ");
+        if(i < numCh-1)Serial.print(", ");
       }
   Serial.print("\n");
 }
 
 void checkSchedule()        // check if ramping should start
 {
-  if (year() != 1970) {
-    sprintf(Date, "%02d/%02d/%04d",  day(), month(), year());
-    sprintf(Time, "%02d:%02d:%02d", hour(), minute(), second());
+  if (year() != 1970) 
+  {
     nowseconds = ((hour() * 3600) + (minute() * 60) + second());
     if(smartStartupRun == false)
     {
       smartLEDStartup();
       smartStartupRun = true;
+      setSyncInterval(600000); //set time sync to every 10 minutes
     }
-  }else{
+  }else
+  {
     nowseconds = 86401; //set seconds out of range to avoid un-wanted ramps
   }
   
   int i;
   int difference;
-  if (nowseconds == sunriseSecond) //ramp from 0 to sunrise values
+  if((nowseconds == sunriseSecond)&&(fadeInProgress != 3)) //ramp from 0 to sunrise values
   {
-    Serial.println("Starting sunrise...");
-    fadeInProgress = true;
+    sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
+    Serial.print("Time: ");
+    Serial.print(Time);
+    Serial.println("\tStarting sunrise...");
+    fadeInProgress = 3;
     fadeStartTimeMillis = millis();
     fadeStartTimeSeconds = now();
-    for (i = 0; i < numCh; i = i + 1) {
+    for(i = 0; i < numCh; i = i + 1) {
       LEDsettings[i].targetPWM = LEDsettings[i].dimPWM;
       LEDsettings[i].lastPWM = LEDsettings[i].currentPWM;
       if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM){difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);}
@@ -333,10 +329,13 @@ void checkSchedule()        // check if ramping should start
       LEDsettings[i].fadeIncrementTime = fadeTimeMillis / difference;
     }
   }
-  else if (nowseconds == startsecond) //ramp from sunrise to max 
+  else if((nowseconds == startsecond)&&(fadeInProgress != 4)) //ramp from sunrise to max 
   {
-    Serial.println("Ramping to full brightness...");
-    fadeInProgress = true;
+    sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
+    Serial.print("Time: ");
+    Serial.print(Time);
+    Serial.println("\tRamping to full brightness...");
+    fadeInProgress = 4;
     fadeStartTimeMillis = millis();
     fadeStartTimeSeconds = now();
     for (i = 0; i < numCh; i = i + 1) {
@@ -347,10 +346,13 @@ void checkSchedule()        // check if ramping should start
       LEDsettings[i].fadeIncrementTime = fadeTimeMillis / difference;
     }
   }
-  else if (nowseconds == stopsecond) //ramp from max to sunset values
+  else if((nowseconds == stopsecond)&&(fadeInProgress != 5)) //ramp from max to sunset values
   {
-    Serial.println("Starting sunset...");
-    fadeInProgress = true;
+    sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
+    Serial.print("Time: ");
+    Serial.print(Time);
+    Serial.println("\tStarting sunset...");
+    fadeInProgress = 5;
     fadeStartTimeMillis = millis();
     fadeStartTimeSeconds = now();
     for (i = 0; i < numCh; i = i + 1) {
@@ -361,11 +363,14 @@ void checkSchedule()        // check if ramping should start
       LEDsettings[i].fadeIncrementTime = fadeTimeMillis / difference;
     }
   }
-  else if (nowseconds == sunsetSecond) //ramp from sunset to off
+  else if((nowseconds == sunsetSecond)&&(fadeInProgress != 6)) //ramp from sunset to off
   {
-    Serial.println("Ramping LEDs off...");
+    sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
+    Serial.print("Time: ");
+    Serial.print(Time);
+    Serial.println("\tRamping LEDs off...");
     // code here to start the led fade off routine
-    fadeInProgress = true;
+    fadeInProgress = 6;
     fadeStartTimeMillis = millis();
     fadeStartTimeSeconds = now();
     for (i = 0; i < numCh; i = i + 1) {
@@ -381,7 +386,7 @@ void checkSchedule()        // check if ramping should start
 void ledFade() {
   int i;
   unsigned long timeElapsed = millis() - fadeStartTimeMillis; //time since the start of fade
-  if(fadeInProgress)
+  if(fadeInProgress != 0)
   {
     for (i = 0; i < numCh; i = i + 1)
     {
@@ -405,7 +410,7 @@ void ledFade() {
     }
     if(now() > (fadeStartTimeSeconds + fadeTimeSeconds))
     {
-      fadeInProgress = false;
+      fadeInProgress = 0;
       for (i = 0; i < numCh; i = i + 1) {
         LEDsettings[i].currentPWM = LEDsettings[i].targetPWM;
       }
@@ -422,27 +427,6 @@ void writeLEDs() {
   for (i = 0; i < numCh; i = i + 1) {
     pwm.setPWM(i, 0, LEDsettings[i].currentPWM);
   }
-}
-
-// Digital clock display of the time
-void clockDisplay()
-{
-  // You can call hour(), minute(), ... at any time
-  // Please see Time library examples for details
-
-  String currentTime = String(hour()) + ":" + minute() + ":" + second();
-  String currentDate = String(month()) + " " + day() + " " + year();
-  nowseconds = ((hour() * 3600) + (minute() * 60) + second());
-  Serial.print("Time =");
-  Serial.println(currentTime);
-  Serial.print("Nowseconds =");
-  Serial.println(nowseconds);
-  Serial.print("Start = ");
-  Serial.println(startsecond);
-  Serial.print("Stop = ");
-  Serial.println(stopsecond);
-  Serial.println();
-  Blynk.virtualWrite(V8, currentTime);
 }
 
 void checkTemp()
@@ -600,27 +584,27 @@ void smartLEDStartup()
   {
     Serial.println("Setting lights to moonlight mode based on current time...");
     for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].moonPWM;}
-    fadeInProgress=false;
+    fadeInProgress = 0;
     writeLEDs();
   }
   if(LEDStartMode == 1)
   {
     Serial.println("Setting lights to sunrise/set levels based on current time...");
     for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].dimPWM;}
-    fadeInProgress=false;
+    fadeInProgress = 0;
     writeLEDs();
   }
   if(LEDStartMode == 2)
   {
     Serial.println("Setting lights to daylight levels based on current time...");
     for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].maxPWM;}
-    fadeInProgress=false;
+    fadeInProgress = 0;
     writeLEDs();
   }
   if(LEDStartMode == 3)
   {
     Serial.println("Setting lights to sunrise mode based on current time...");
-    fadeInProgress = true;
+    fadeInProgress = 3;
     if(nowseconds > ramp1s) //normal operation
     {
       fadeStartTimeSeconds = now() - (nowseconds - ramp1s);
@@ -642,7 +626,7 @@ void smartLEDStartup()
   if(LEDStartMode == 4)
   {
     Serial.println("Setting lights to ramp up to daylight mode based on current time...");
-    fadeInProgress = true;
+    fadeInProgress = 4;
     if(nowseconds > ramp2s) //normal operation
     {
       fadeStartTimeSeconds = now() - (nowseconds - ramp2s);
@@ -665,7 +649,7 @@ void smartLEDStartup()
   if(LEDStartMode == 5)
   {
     Serial.println("Setting lights to ramp down from daylight based on current time...");
-    fadeInProgress = true;
+    fadeInProgress = 5;
     if(nowseconds > ramp3s) //normal operation
     {
       fadeStartTimeSeconds = now() - (nowseconds - ramp3s);
@@ -688,7 +672,7 @@ void smartLEDStartup()
   if(LEDStartMode == 6)
   {
     Serial.println("Setting lights to sunset mode based on current time...");
-    fadeInProgress = true;
+    fadeInProgress = 6;
     if(nowseconds > ramp4s) //normal operation
     {
       fadeStartTimeSeconds = now() - (nowseconds - ramp4s);
@@ -708,4 +692,28 @@ void smartLEDStartup()
       LEDsettings[i].fadeIncrementTime = fadeTimeMillis / difference;
     }
   }
+}
+
+// returns scaling factor for current day in lunar cycle
+byte lunarCycleScaling()
+{
+  byte scaleFactor[] = {25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100,
+                      95,90,85,80,75,70,65,60,55,50,45,40,35,30};
+  tmElements_t fixedDate = {0,35,20,0,7,1,0};
+  long lp = 2551443;
+  time_t newMoonCycle = makeTime(fixedDate);
+  long phase = (now() - newMoonCycle) % lp;
+  long returnValue = ((phase / 86400) + 1);
+  return scaleFactor[returnValue];
+}
+
+// returns day in lunar cycle 0-29
+byte getLunarCycleDay()
+{
+  tmElements_t fixedDate = {0,35,20,0,7,1,0};
+  long lp = 2551443;
+  time_t newMoonCycle = makeTime(fixedDate);
+  long phase = (now() - newMoonCycle) % lp;
+  long returnValue = ((phase / 86400) + 1);
+  return returnValue;
 }
