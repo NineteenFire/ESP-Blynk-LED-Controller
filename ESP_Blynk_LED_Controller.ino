@@ -247,9 +247,9 @@ void setup()
   
   timer.setInterval(500L, ledFade);           // adjust the led lighting every 500ms
   timer.setInterval(1000L, checkSchedule);    // check every second if fade should start
-  timer.setInterval(10000L, checkTemp);       // check heatsink temperature every 10 seconds
+  timer.setInterval(15000L, checkTemp);       // check heatsink temperature every 15 seconds
   timer.setInterval(60000L, reconnectBlynk);  // check every 60s if still connected to server
-
+  
   digitalWrite(BUILTIN_LED, HIGH); //ensure light is OFF
   Blynk.notify("LED Controller ONLINE");
   Serial.println("End of startup.");
@@ -385,9 +385,9 @@ void checkSchedule()        // check if ramping should start
 
 void ledFade() {
   int i;
-  unsigned long timeElapsed = millis() - fadeStartTimeMillis; //time since the start of fade
   if(fadeInProgress != 0)
   {
+    unsigned long timeElapsed = millis() - fadeStartTimeMillis; //time since the start of fade
     for (i = 0; i < numCh; i = i + 1)
     {
       if(LEDsettings[i].lastPWM < LEDsettings[i].targetPWM)
@@ -425,7 +425,7 @@ void ledFade() {
 void writeLEDs() {
   int i;
   for (i = 0; i < numCh; i = i + 1) {
-    pwm.setPWM(i, 0, LEDsettings[i].currentPWM);
+    pwm.setPin(i, LEDsettings[i].currentPWM);
   }
 }
 
@@ -435,11 +435,17 @@ void checkTemp()
   sensors.requestTemperatures();
   float temperature[numTempSensors];
   float maxTemperature = 0.0;
-  for(int i; i < numTempSensors ; i++)
+  int i = 0;
+  Serial.print("Temperature sensors: ");
+  for(i = 0 ; i < numTempSensors ; i++)
   {
     temperature[i] = sensors.getTempC(tempSensors[i]);
     if(temperature[i] > maxTemperature)maxTemperature=temperature[i];
+    Serial.print(temperature[i]);
+    Serial.print("C");
+    if(i-- != numTempSensors)Serial.print(", ");
   }
+  Serial.print("\n");
   
   //write the maximum temperature to Blynk
   Blynk.virtualWrite(V20, maxTemperature);
