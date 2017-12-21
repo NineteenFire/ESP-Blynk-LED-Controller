@@ -11,51 +11,57 @@ BLYNK_CONNECTED()
 }
 BLYNK_WRITE(V0) {// slider widget to set the maximum led level from the Blynk App.
   int value = param.asInt();
+  value = map(value, 0, 100, 0, 4095);
   //if in mode 1 or 2 take new value as tempPWM and set LED to that value for viewing purposes
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[0].tempPWM = value;
-    pwm.setPWM(0, 0, LEDsettings[0].tempPWM);
+    pwm.setPin(0, LEDsettings[0].tempPWM);
   }
 }
 BLYNK_WRITE(V1) {// slider widget to set the maximum led level from the Blynk App.
   int value = param.asInt();
+  value = map(value, 0, 100, 0, 4095);
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[1].tempPWM = value;
-    pwm.setPWM(1, 0, LEDsettings[1].tempPWM);
+    pwm.setPin(1, LEDsettings[1].tempPWM);
   }
 }
 BLYNK_WRITE(V2) {// slider widget to set the maximum led level from the Blynk App.
   int value = param.asInt();
+  value = map(value, 0, 100, 0, 4095);
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[2].tempPWM = value;
-    pwm.setPWM(2, 0, LEDsettings[2].tempPWM);
+    pwm.setPin(2, LEDsettings[2].tempPWM);
   }
 }
 BLYNK_WRITE(V3) {// slider widget to set the maximum led level from the Blynk App.
   int value = param.asInt();
+  value = map(value, 0, 100, 0, 4095);
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[3].tempPWM = value;
-    pwm.setPWM(3, 0, LEDsettings[3].tempPWM);
+    pwm.setPin(3, LEDsettings[3].tempPWM);
   }
 }
 BLYNK_WRITE(V4) {// slider widget to set the maximum led level from the Blynk App.
   int value = param.asInt();
+  value = map(value, 0, 100, 0, 4095);
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[4].tempPWM = value;
-    pwm.setPWM(4, 0, LEDsettings[4].tempPWM);
+    pwm.setPin(4, LEDsettings[4].tempPWM);
   }
 }
 BLYNK_WRITE(V5) {// slider widget to set the maximum led level from the Blynk App.
   int value = param.asInt();
+  value = map(value, 0, 100, 0, 4095);
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[5].tempPWM = value;
-    pwm.setPWM(5, 0, LEDsettings[5].tempPWM);
+    pwm.setPin(5, LEDsettings[5].tempPWM);
   }
 }
 /*
@@ -63,18 +69,20 @@ BLYNK_WRITE(V5) {// slider widget to set the maximum led level from the Blynk Ap
  * 
 BLYNK_WRITE(V6) {// slider widget to set the maximum led level from the Blynk App.
   int value = param.asInt();
+  value = map(value, 0, 100, 0, 4095);
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[6].tempPWM = value;
-    pwm.setPWM(6, 0, LEDsettings[56].tempPWM);
+    pwm.setPin(6, LEDsettings[56].tempPWM);
   }
 }
 BLYNK_WRITE(V7) {// slider widget to set the maximum led level from the Blynk App.
   int value = param.asInt();
+  value = map(value, 0, 100, 0, 4095);
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[7].tempPWM = value;
-    pwm.setPWM(7, 0, LEDsettings[7].tempPWM);
+    pwm.setPin(7, LEDsettings[7].tempPWM);
   }
 }*/
 BLYNK_WRITE(V10) //Blynk pin for sunrise/sunset time (time LEDs start turning on / hit moon values)
@@ -156,7 +164,7 @@ BLYNK_WRITE(V12) // slider widget to set the led fade duration up tp 3 hours.
 BLYNK_WRITE(V15) {// menu input to select LED mode
   LEDMode = param.asInt();
   int i;
-  int difference;
+  int value;
   if(LEDMode == 1) //normal operation
   {
     if (year() != 1970)
@@ -175,41 +183,59 @@ BLYNK_WRITE(V15) {// menu input to select LED mode
   if(LEDMode == 2)
   {
     for (i = 0; i < numCh; i = i + 1) {
-        pwm.setPWM(i, 0, LEDsettings[i].maxPWM);
+        pwm.setPin(i, LEDsettings[i].maxPWM);
         LEDsettings[i].tempPWM = LEDsettings[i].maxPWM;
       }
-      Blynk.virtualWrite(V0, LEDsettings[0].tempPWM);
-      Blynk.virtualWrite(V1, LEDsettings[1].tempPWM);
-      Blynk.virtualWrite(V2, LEDsettings[2].tempPWM);
-      Blynk.virtualWrite(V3, LEDsettings[3].tempPWM);
-      Blynk.virtualWrite(V4, LEDsettings[4].tempPWM);
-      Blynk.virtualWrite(V5, LEDsettings[5].tempPWM);
+      value = map(LEDsettings[0].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V0, value);
+      value = map(LEDsettings[1].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V1, value);
+      value = map(LEDsettings[2].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V2, value);
+      value = map(LEDsettings[3].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V3, value);
+      value = map(LEDsettings[4].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V4, value);
+      value = map(LEDsettings[5].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V5, value);
   }
   if(LEDMode == 3)
   {
     for (i = 0; i < numCh; i = i + 1) {
-        pwm.setPWM(i, 0, LEDsettings[i].dimPWM);
+        pwm.setPin(i, LEDsettings[i].dimPWM);
         LEDsettings[i].tempPWM = LEDsettings[i].dimPWM;
       }
-      Blynk.virtualWrite(V0, LEDsettings[0].tempPWM);
-      Blynk.virtualWrite(V1, LEDsettings[1].tempPWM);
-      Blynk.virtualWrite(V2, LEDsettings[2].tempPWM);
-      Blynk.virtualWrite(V3, LEDsettings[3].tempPWM);
-      Blynk.virtualWrite(V4, LEDsettings[4].tempPWM);
-      Blynk.virtualWrite(V5, LEDsettings[5].tempPWM);
+      value = map(LEDsettings[0].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V0, value);
+      value = map(LEDsettings[1].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V1, value);
+      value = map(LEDsettings[2].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V2, value);
+      value = map(LEDsettings[3].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V3, value);
+      value = map(LEDsettings[4].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V4, value);
+      value = map(LEDsettings[5].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V5, value);
   }
   if(LEDMode == 4)
   {
     for (i = 0; i < numCh; i = i + 1) {
-        pwm.setPWM(i, 0, LEDsettings[i].moonPWM);
+        pwm.setPin(i, LEDsettings[i].moonPWM);
         LEDsettings[i].tempPWM = LEDsettings[i].moonPWM;
       }
-      Blynk.virtualWrite(V0, LEDsettings[0].tempPWM);
-      Blynk.virtualWrite(V1, LEDsettings[1].tempPWM);
-      Blynk.virtualWrite(V2, LEDsettings[2].tempPWM);
-      Blynk.virtualWrite(V3, LEDsettings[3].tempPWM);
-      Blynk.virtualWrite(V4, LEDsettings[4].tempPWM);
-      Blynk.virtualWrite(V5, LEDsettings[5].tempPWM);
+      value = map(LEDsettings[0].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V0, value);
+      value = map(LEDsettings[1].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V1, value);
+      value = map(LEDsettings[2].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V2, value);
+      value = map(LEDsettings[3].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V3, value);
+      value = map(LEDsettings[4].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V4, value);
+      value = map(LEDsettings[5].tempPWM, 0, 4095, 0, 100);
+      Blynk.virtualWrite(V5, value);
   }
 }
 BLYNK_WRITE(V16) {// Save button for LED settings
