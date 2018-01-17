@@ -21,6 +21,7 @@ byte pSCL=5;
 byte pEnFAN=16;
 byte pFANPWM=0;
 byte pOneWire=13;
+byte pLED=2;
 
 // WiFiManager
 char blynk_token[34] = "BLYNK_TOKEN";//added from WiFiManager - AutoConnectWithFSParameters
@@ -93,15 +94,15 @@ void setup()
   ArduinoOTA.begin();
   Serial.begin(115200);
   
-  pinMode(BUILTIN_LED, OUTPUT);
+  pinMode(pLED, OUTPUT);
   pinMode(pFANPWM, OUTPUT);
   pinMode(pEnFAN, OUTPUT);
-  digitalWrite(BUILTIN_LED, LOW);
+  digitalWrite(pLED, LOW);
   digitalWrite(pFANPWM, LOW);
   digitalWrite(pEnFAN, LOW);
   
   pwm.begin();
-  pwm.setPWMFreq(500);
+  pwm.setPWMFreq(250);
 
   //Start dallas temperature temp sensors
   sensors.begin();
@@ -250,7 +251,7 @@ void setup()
   timer.setInterval(15000L, checkTemp);       // check heatsink temperature every 15 seconds
   timer.setInterval(60000L, reconnectBlynk);  // check every 60s if still connected to server
   
-  digitalWrite(BUILTIN_LED, HIGH); //ensure light is OFF
+  digitalWrite(pLED, HIGH); //ensure light is OFF
   Blynk.notify("LED Controller ONLINE");
   Serial.println("End of startup.");
 }
@@ -268,19 +269,19 @@ void loop()
 void reconnectBlynk() {
   if (!Blynk.connected())
   {
-    digitalWrite(BUILTIN_LED, LOW);
+    digitalWrite(pLED, LOW);
     if (Blynk.connect())
     {
-      digitalWrite(BUILTIN_LED, HIGH);
+      digitalWrite(pLED, HIGH);
       BLYNK_LOG("Reconnected");
     }
     else {
-      digitalWrite(BUILTIN_LED, LOW);
+      digitalWrite(pLED, LOW);
       BLYNK_LOG("Not reconnected");
     }
   }else
   {
-    digitalWrite(BUILTIN_LED, HIGH);
+    digitalWrite(pLED, HIGH);
   }
   //Print LED values to serial once per minute for debugging
   sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
@@ -383,28 +384,32 @@ void checkSchedule()        // check if ramping should start
   }
 }
 
-void ledFade() {
+void ledFade()
+{
   int i;
   if(fadeInProgress != 0)
   {
     unsigned long timeElapsed = millis() - fadeStartTimeMillis; //time since the start of fade
     for (i = 0; i < numCh; i = i + 1)
     {
-      if(LEDsettings[i].lastPWM < LEDsettings[i].targetPWM)
+      if(LEDsettings[i].currentPWM != LEDsettings[i].targetPWM)
       {
-        //value increasing
-        LEDsettings[i].currentPWM = LEDsettings[i].lastPWM + (timeElapsed / LEDsettings[i].fadeIncrementTime);
-      }
-      if(LEDsettings[i].lastPWM > LEDsettings[i].targetPWM)
-      {
-        //value decreasing
-        LEDsettings[i].currentPWM = LEDsettings[i].lastPWM - (timeElapsed / LEDsettings[i].fadeIncrementTime);
-      }
-      //if target == last set to target
-      if(LEDsettings[i].lastPWM == LEDsettings[i].targetPWM)
-      {
-        //value decreasing
-        LEDsettings[i].currentPWM = LEDsettings[i].targetPWM;
+        //if adjustments are necessary
+        if(LEDsettings[i].lastPWM < LEDsettings[i].targetPWM)
+        {
+          //value increasing
+          LEDsettings[i].currentPWM = LEDsettings[i].lastPWM + (timeElapsed / LEDsettings[i].fadeIncrementTime);
+        }
+        if(LEDsettings[i].lastPWM > LEDsettings[i].targetPWM)
+        {
+          //value decreasing
+          LEDsettings[i].currentPWM = LEDsettings[i].lastPWM - (timeElapsed / LEDsettings[i].fadeIncrementTime);
+        }
+        //if target == last set to target
+        if(LEDsettings[i].lastPWM == LEDsettings[i].targetPWM)
+        {
+          LEDsettings[i].currentPWM = LEDsettings[i].targetPWM;
+        }
       }
       LEDsettings[i].currentPWM = constrain(LEDsettings[i].currentPWM,0,4095);
     }
@@ -425,7 +430,8 @@ void ledFade() {
 void writeLEDs() {
   int i;
   for (i = 0; i < numCh; i = i + 1) {
-    pwm.setPin(i, LEDsettings[i].currentPWM);
+    //pwm.setPin(i, LEDsettings[i].currentPWM);
+    pwm.setPWM(i,0,LEDsettings[i].currentPWM);
   }
 }
 
@@ -436,16 +442,11 @@ void checkTemp()
   float temperature[numTempSensors];
   float maxTemperature = 0.0;
   int i = 0;
-  Serial.print("Temperature sensors: ");
   for(i = 0 ; i < numTempSensors ; i++)
   {
     temperature[i] = sensors.getTempC(tempSensors[i]);
     if(temperature[i] > maxTemperature)maxTemperature=temperature[i];
-    Serial.print(temperature[i]);
-    Serial.print("C");
-    if(i-- != numTempSensors)Serial.print(", ");
   }
-  Serial.print("\n");
   
   //write the maximum temperature to Blynk
   Blynk.virtualWrite(V20, maxTemperature);
