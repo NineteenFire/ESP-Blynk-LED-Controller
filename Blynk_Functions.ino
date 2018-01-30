@@ -4,9 +4,10 @@ BLYNK_CONNECTED()
   if (isFirstConnect)
   {
     Blynk.syncVirtual(V12);//check fade time before schedule
-    Blynk.syncVirtual(V10,V11,V22); //Read start/stop/sunrise/sunset times, fade duration, fan on temp
+    Blynk.syncVirtual(V10,V11,V13,V22); //Read start/stop/sunrise/sunset times, fan on temp
     Blynk.virtualWrite(V15,1);
     isFirstConnect = false;
+    Blynk.run();
   }
 }
 BLYNK_WRITE(V0) {// slider widget to set the maximum led level from the Blynk App.
@@ -161,6 +162,34 @@ BLYNK_WRITE(V12) // slider widget to set the led fade duration up tp 3 hours.
   Serial.print("Fade Time in seconds: ");
   Serial.println(fadeTimeSeconds);
 }
+BLYNK_WRITE(V13) //Blynk pin for moonlight time
+{
+  TimeInputParam t(param);
+
+  if (t.hasStartTime())
+  {
+    moonStartSecond = (t.getStartHour() * 3600) + (t.getStartMinute() * 60);
+  }else
+  {
+    //if start time is not set assume 11PM
+    moonStartSecond = 82800;
+  }
+  if (t.hasStopTime())
+  {
+    moonStopSecond = ((t.getStopHour() * 3600) + (t.getStopMinute() * 60) - fadeTimeSeconds + 86400) % 86400;
+  }else
+  {
+    //if stop time is not set assume 2AM
+    moonStopSecond = (86400 + 7200 - fadeTimeSeconds) % 86400;
+  }
+
+  sprintf(Time, "%02d:%02d:%02d", moonStartSecond/3600 , (moonStartSecond / 60) % 60, 0);
+  Serial.print("Moonlight start time is: ");
+  Serial.println(Time);
+  sprintf(Time, "%02d:%02d:%02d", moonStopSecond/3600 , (moonStopSecond / 60) % 60, 0);
+  Serial.print("Moonlight stop time is: ");
+  Serial.println(Time);
+}
 BLYNK_WRITE(V15) {// menu input to select LED mode
   LEDMode = param.asInt();
   int i;
@@ -172,15 +201,9 @@ BLYNK_WRITE(V15) {// menu input to select LED mode
       //Set LEDs to expected value based on time as long as time is set
       smartLEDStartup();
     }
-    //Set sliders to 0 since we don't keep updating them during normal operation
-    Blynk.virtualWrite(V0, 0);
-    Blynk.virtualWrite(V1, 0);
-    Blynk.run();
-    Blynk.virtualWrite(V2, 0);
-    Blynk.virtualWrite(V3, 0);
-    Blynk.run();
-    Blynk.virtualWrite(V4, 0);
-    Blynk.virtualWrite(V5, 0);
+    for (i = 0; i < numCh; i = i + 1){
+        LEDsettings[i].tempPWM = 0;
+      }
   }
   if(LEDMode == 2)
   {
@@ -188,20 +211,6 @@ BLYNK_WRITE(V15) {// menu input to select LED mode
         pwm.setPin(i, LEDsettings[i].maxPWM);
         LEDsettings[i].tempPWM = LEDsettings[i].maxPWM;
       }
-      value = map(LEDsettings[0].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V0, value);
-      value = map(LEDsettings[1].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V1, value);
-      Blynk.run();
-      value = map(LEDsettings[2].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V2, value);
-      value = map(LEDsettings[3].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V3, value);
-      Blynk.run();
-      value = map(LEDsettings[4].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V4, value);
-      value = map(LEDsettings[5].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V5, value);
   }
   if(LEDMode == 3)
   {
@@ -209,20 +218,6 @@ BLYNK_WRITE(V15) {// menu input to select LED mode
         pwm.setPin(i, LEDsettings[i].dimPWM);
         LEDsettings[i].tempPWM = LEDsettings[i].dimPWM;
       }
-      value = map(LEDsettings[0].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V0, value);
-      value = map(LEDsettings[1].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V1, value);
-      Blynk.run();
-      value = map(LEDsettings[2].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V2, value);
-      value = map(LEDsettings[3].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V3, value);
-      Blynk.run();
-      value = map(LEDsettings[4].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V4, value);
-      value = map(LEDsettings[5].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V5, value);
   }
   if(LEDMode == 4)
   {
@@ -230,21 +225,22 @@ BLYNK_WRITE(V15) {// menu input to select LED mode
         pwm.setPin(i, LEDsettings[i].moonPWM);
         LEDsettings[i].tempPWM = LEDsettings[i].moonPWM;
       }
-      value = map(LEDsettings[0].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V0, value);
-      value = map(LEDsettings[1].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V1, value);
-      Blynk.run();
-      value = map(LEDsettings[2].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V2, value);
-      value = map(LEDsettings[3].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V3, value);
-      Blynk.run();
-      value = map(LEDsettings[4].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V4, value);
-      value = map(LEDsettings[5].tempPWM, 0, 4095, 0, 1000);
-      Blynk.virtualWrite(V5, value);
   }
+  value = map(LEDsettings[0].tempPWM, 0, 4095, 0, 1000);
+  Blynk.virtualWrite(V0, value);
+  value = map(LEDsettings[1].tempPWM, 0, 4095, 0, 1000);
+  Blynk.virtualWrite(V1, value);
+  Blynk.run();
+  value = map(LEDsettings[2].tempPWM, 0, 4095, 0, 1000);
+  Blynk.virtualWrite(V2, value);
+  value = map(LEDsettings[3].tempPWM, 0, 4095, 0, 1000);
+  Blynk.virtualWrite(V3, value);
+  Blynk.run();
+  value = map(LEDsettings[4].tempPWM, 0, 4095, 0, 1000);
+  Blynk.virtualWrite(V4, value);
+  value = map(LEDsettings[5].tempPWM, 0, 4095, 0, 1000);
+  Blynk.virtualWrite(V5, value);
+  Blynk.run();
 }
 BLYNK_WRITE(V16) {// Save button for LED settings
   int buttonState = param.asInt();
