@@ -17,7 +17,7 @@ BLYNK_WRITE(V0) {// slider widget to set the maximum led level from the Blynk Ap
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[0].tempPWM = value;
-    pwm.setPin(0, LEDsettings[0].tempPWM);
+    pwm.setPWM(0, 0, LEDsettings[0].tempPWM);
   }
 }
 BLYNK_WRITE(V1) {// slider widget to set the maximum led level from the Blynk App.
@@ -26,7 +26,7 @@ BLYNK_WRITE(V1) {// slider widget to set the maximum led level from the Blynk Ap
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[1].tempPWM = value;
-    pwm.setPin(1, LEDsettings[1].tempPWM);
+    pwm.setPWM(1, 0, LEDsettings[1].tempPWM);
   }
 }
 BLYNK_WRITE(V2) {// slider widget to set the maximum led level from the Blynk App.
@@ -35,7 +35,7 @@ BLYNK_WRITE(V2) {// slider widget to set the maximum led level from the Blynk Ap
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[2].tempPWM = value;
-    pwm.setPin(2, LEDsettings[2].tempPWM);
+    pwm.setPWM(2, 0, LEDsettings[2].tempPWM);
   }
 }
 BLYNK_WRITE(V3) {// slider widget to set the maximum led level from the Blynk App.
@@ -44,7 +44,7 @@ BLYNK_WRITE(V3) {// slider widget to set the maximum led level from the Blynk Ap
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[3].tempPWM = value;
-    pwm.setPin(3, LEDsettings[3].tempPWM);
+    pwm.setPWM(3, 0, LEDsettings[3].tempPWM);
   }
 }
 BLYNK_WRITE(V4) {// slider widget to set the maximum led level from the Blynk App.
@@ -53,7 +53,7 @@ BLYNK_WRITE(V4) {// slider widget to set the maximum led level from the Blynk Ap
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[4].tempPWM = value;
-    pwm.setPin(4, LEDsettings[4].tempPWM);
+    pwm.setPWM(4, 0, LEDsettings[4].tempPWM);
   }
 }
 BLYNK_WRITE(V5) {// slider widget to set the maximum led level from the Blynk App.
@@ -62,7 +62,7 @@ BLYNK_WRITE(V5) {// slider widget to set the maximum led level from the Blynk Ap
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[5].tempPWM = value;
-    pwm.setPin(5, LEDsettings[5].tempPWM);
+    pwm.setPWM(5, 0, LEDsettings[5].tempPWM);
   }
 }
 /*
@@ -141,17 +141,6 @@ BLYNK_WRITE(V11) //Blynk pin for daylight start/stop time
   sprintf(Time, "%02d:%02d:%02d", stopsecond/3600 , ((stopsecond / 60) % 60), 0);
   Serial.print("Daylight stop time is: ");
   Serial.println(Time);
-  /*
-  if(startsecond < (sunriseSecond + fadeTimeSeconds))
-  {
-    //ramp to full brightness starting before sunrise finished
-    Blynk.notify("Sunrise plus ramp time should be earlier than Daylight start time");
-  }
-  if(stopsecond > (sunsetSecond - fadeTimeSeconds))
-  {
-    //ramp to moonlight starting before ramp to sunset finished
-    Blynk.notify("Daylight stop time should be earlier than sunset time (note: ramp finishes at sunset time)");
-  }*/
 }
 BLYNK_WRITE(V12) // slider widget to set the led fade duration up tp 3 hours.
 {
@@ -208,21 +197,21 @@ BLYNK_WRITE(V15) {// menu input to select LED mode
   if(LEDMode == 2)
   {
     for (i = 0; i < numCh; i = i + 1) {
-        pwm.setPin(i, LEDsettings[i].maxPWM);
+        pwm.setPWM(i, 0, LEDsettings[i].maxPWM);
         LEDsettings[i].tempPWM = LEDsettings[i].maxPWM;
       }
   }
   if(LEDMode == 3)
   {
     for (i = 0; i < numCh; i = i + 1) {
-        pwm.setPin(i, LEDsettings[i].dimPWM);
+        pwm.setPWM(i, 0, LEDsettings[i].dimPWM);
         LEDsettings[i].tempPWM = LEDsettings[i].dimPWM;
       }
   }
   if(LEDMode == 4)
   {
     for (i = 0; i < numCh; i = i + 1) {
-        pwm.setPin(i, LEDsettings[i].moonPWM);
+        pwm.setPWM(i, 0, LEDsettings[i].moonPWM);
         LEDsettings[i].tempPWM = LEDsettings[i].moonPWM;
       }
   }
