@@ -18,11 +18,11 @@
 
 ## Hardware
 
-![alt text](pictures/Connections.png "Breadboard wiring diagram")
+![Breadboard wiring diagram](https://i.imgur.com/4xU6HxX.png)
 Parts needed:
 - Wemos D1 (or nodeMCU)
 - DS18B20
 - Adafruit PCA9685
 - N-Channel MOSFet to drive fan
 
-![alt text](pictures/Driver PCB.png "Custom driver PCB")
+![Custom driver PCB](https://i.imgur.com/vgvPy1l.png)
