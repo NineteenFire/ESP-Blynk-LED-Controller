@@ -97,13 +97,14 @@ void readPWMValues()
 
 void clearPWMValues()
 {
-  //Save tempPWM values to dimPWM EEPROM
+  //Clear out all data from EEPROM range we need to store values in
   EEPROM.begin(512);
   int addr = 0;
   int i;
   for (i = 0; i < (numCh*3); i = i + 1)
   {
-    addr += EEPROM.put(addr, 0);
+    EEPROM.put(addr, 0L);
+    addr = addr + 4;
   }
   EEPROM.write(500,numCh);
   EEPROM.end();
