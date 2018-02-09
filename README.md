@@ -15,3 +15,14 @@
 6. Hit the save button, this will save the current slider values to that mode
 7. Repeat steps 4-6 for dim levels and moonlight levels
 8. Set mode to normal operation and you should be good to go
+
+## Hardware
+
+![alt text](pictures/Connections.png "Breadboard wiring diagram")
+Parts needed:
+- Wemos D1 (or nodeMCU)
+- DS18B20
+- Adafruit PCA9685
+- N-Channel MOSFet to drive fan
+
+![alt text](pictures/Driver PCB.png "Custom driver PCB")
