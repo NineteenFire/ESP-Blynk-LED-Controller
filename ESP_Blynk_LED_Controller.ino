@@ -21,7 +21,7 @@ byte pSCL=5;
 byte pEnFAN=16;
 byte pFANPWM=0;
 byte pOneWire=13;
-byte pLED=2;
+byte pOnBoardLED=2;
 
 // WiFiManager
 char blynk_token[34] = "BLYNK_TOKEN";//added from WiFiManager - AutoConnectWithFSParameters
@@ -87,19 +87,21 @@ int numTempSensors;
 int fanOnTemp = 0;
 
 WidgetRTC rtc;
+WidgetLED fanLED(V14);
 SimpleTimer timer;
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
 void setup()
 {
   Wire.begin(pSDA,pSCL);
+  //Wire.setClock(400000L);
   ArduinoOTA.begin();
   Serial.begin(115200);
   
-  pinMode(pLED, OUTPUT);
+  pinMode(pOnBoardLED, OUTPUT);
   pinMode(pFANPWM, OUTPUT);
   pinMode(pEnFAN, OUTPUT);
-  digitalWrite(pLED, LOW);
+  digitalWrite(pOnBoardLED, LOW);
   digitalWrite(pFANPWM, LOW);
   digitalWrite(pEnFAN, LOW);
   
@@ -183,7 +185,7 @@ void setup()
   //sets timeout until configuration portal gets turned off
   //useful to make it all retry or go to sleep
   //in seconds
-  wifiManager.setTimeout(180);
+  wifiManager.setTimeout(300);
 
   //fetches ssid and pass and tries to connect
   //if it does not connect it starts an access point with the specified name
@@ -253,7 +255,7 @@ void setup()
   timer.setInterval(15000L, checkTemp);       // check heatsink temperature every 15 seconds
   timer.setInterval(60000L, reconnectBlynk);  // check every 60s if still connected to server
   
-  digitalWrite(pLED, HIGH); //ensure light is OFF
+  digitalWrite(pOnBoardLED, HIGH); //ensure light is OFF
   Blynk.notify("LED Controller ONLINE");
   Serial.println("End of startup.");
 }
@@ -271,21 +273,24 @@ void loop()
 void reconnectBlynk() {
   if (!Blynk.connected())
   {
-    digitalWrite(pLED, LOW);
+    //Turn onboard LED on to indiciate there is an issue
+    digitalWrite(pOnBoardLED, LOW);
     if (Blynk.connect())
     {
-      digitalWrite(pLED, HIGH);
+      digitalWrite(pOnBoardLED, HIGH);
       BLYNK_LOG("Reconnected");
     }
     else {
-      digitalWrite(pLED, LOW);
+      digitalWrite(pOnBoardLED, LOW);
       BLYNK_LOG("Not reconnected");
     }
   }else
   {
-    digitalWrite(pLED, HIGH);
+    //Turn onboard LED off
+    digitalWrite(pOnBoardLED, HIGH);
   }
   //Print LED values to serial once per minute for debugging
+  /*
   sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
   Serial.print("Time: ");
   Serial.print(Time);
@@ -295,6 +300,7 @@ void reconnectBlynk() {
         if(i < numCh-1)Serial.print(", ");
       }
   Serial.print("\n");
+  */
 }
 
 void checkSchedule()        // check if ramping should start
@@ -504,12 +510,14 @@ void checkTemp()
     analogWrite(pFANPWM,fanPWM);
     //turn fan on
     digitalWrite(pEnFAN,HIGH);
+    fanLED.on();
   }
   if(intTemp < (fanOnTemp-2))
   {
     //turn fan off
     digitalWrite(pEnFAN,LOW);
     analogWrite(pFANPWM,0);
+    fanLED.off();
   }
 }
 
@@ -518,212 +526,57 @@ void smartLEDStartup()
   int i = 0;
   int difference;
   nowseconds = ((hour() * 3600) + (minute() * 60) + second());
-  //s = start, e=end
-  int ramp1s = sunriseSecond;
-  int ramp1e = (sunriseSecond + fadeTimeSeconds) % 86400;
-  int ramp2s = startsecond;
-  int ramp2e = (startsecond + fadeTimeSeconds) % 86400;
-  int ramp3s = stopsecond;
-  int ramp3e = (stopsecond + fadeTimeSeconds) % 86400;
-  int ramp4s = sunsetSecond;
-  int ramp4e = (sunsetSecond + fadeTimeSeconds) % 86400;
-  int ramp5s = moonStartSecond;
-  int ramp5e = (moonStartSecond + fadeTimeSeconds) % 86400;
-  int ramp6s = moonStopSecond;
-  int ramp6e = (moonStopSecond + fadeTimeSeconds) % 86400;
   
   //0=off, 1=moonPWM, 2=dimPWM, 3=maxPWM, 
   //4=Ramp off->dim, 5=Ramp dim->max, 6=Ramp max->dim, 7=Ramp dim->off, 8=Ramp off->moon, 9=Ramp moon->off
-  byte LEDStartMode = 0; 
+  byte LEDStartMode = 99; 
 
   /* General shape of ramps:
-   * |             2e-----3s
-   * |            /         \
-   * |    1e----2s           3e-----4s         5e--6s
-   * |   /                            \       /      \
-   * |-1s                              4e---5s        6e--
-   * |____________________________________________________
+   * |                2e-----3s                        |         -(maxPWM)
+   * |               /         \                       |
+   * |              /           \                      |
+   * |      1e----2s             3e-----4s             |         -(dimPWM)
+   * |     /                              \         5e-|-6s      -(moonPWM)
+   * |    /                                \       /   |   \
+   * |--1s                                  4e---5s    |    6e-- -(off)
+   * |_________________________________________________|________
    */
 
-  //ramp 1 starts after midnight
-       if((ramp1s < ramp6e)&&(nowseconds > ramp6e))LEDStartMode=0;
-  else if((ramp1s < ramp6e)&&(nowseconds < ramp1s))LEDStartMode=0;
-  else if((ramp1s < ramp6e)&&(nowseconds > ramp1s)&&(nowseconds < ramp1e))LEDStartMode=4;
-  else if((ramp1s < ramp6e)&&(nowseconds > ramp1e)&&(nowseconds < ramp2s))LEDStartMode=2;
-  else if((ramp1s < ramp6e)&&(nowseconds > ramp2s)&&(nowseconds < ramp2e))LEDStartMode=5;
-  else if((ramp1s < ramp6e)&&(nowseconds > ramp2e)&&(nowseconds < ramp3s))LEDStartMode=3;
-  else if((ramp1s < ramp6e)&&(nowseconds > ramp3s)&&(nowseconds < ramp3e))LEDStartMode=6;
-  else if((ramp1s < ramp6e)&&(nowseconds > ramp3e)&&(nowseconds < ramp4s))LEDStartMode=2;
-  else if((ramp1s < ramp6e)&&(nowseconds > ramp4s)&&(nowseconds < ramp4e))LEDStartMode=7;
-  else if((ramp1s < ramp6e)&&(nowseconds > ramp4e)&&(nowseconds < ramp5s))LEDStartMode=0;
-  else if((ramp1s < ramp6e)&&(nowseconds > ramp5s)&&(nowseconds < ramp5e))LEDStartMode=8;
-  else if((ramp1s < ramp6e)&&(nowseconds > ramp5e)&&(nowseconds < ramp6s))LEDStartMode=1;
-  else if((ramp1s < ramp6e)&&(nowseconds > ramp6s)&&(nowseconds < ramp6e))LEDStartMode=9;
-
-  //ramp 1 ends after midnight
-  else if((ramp1e < ramp1s)&&(nowseconds > ramp1s))LEDStartMode=4;
-  else if((ramp1e < ramp1s)&&(nowseconds < ramp1e))LEDStartMode=4;
-  else if((ramp1e < ramp1s)&&(nowseconds > ramp1e)&&(nowseconds < ramp2s))LEDStartMode=2;
-  else if((ramp1e < ramp1s)&&(nowseconds > ramp2s)&&(nowseconds < ramp2e))LEDStartMode=5;
-  else if((ramp1e < ramp1s)&&(nowseconds > ramp2e)&&(nowseconds < ramp3s))LEDStartMode=3;
-  else if((ramp1e < ramp1s)&&(nowseconds > ramp3s)&&(nowseconds < ramp3e))LEDStartMode=6;
-  else if((ramp1e < ramp1s)&&(nowseconds > ramp3e)&&(nowseconds < ramp4s))LEDStartMode=2;
-  else if((ramp1e < ramp1s)&&(nowseconds > ramp4s)&&(nowseconds < ramp4e))LEDStartMode=7;
-  else if((ramp1e < ramp1s)&&(nowseconds > ramp4e)&&(nowseconds < ramp5s))LEDStartMode=0;
-  else if((ramp1e < ramp1s)&&(nowseconds > ramp5s)&&(nowseconds < ramp5e))LEDStartMode=8;
-  else if((ramp1e < ramp1s)&&(nowseconds > ramp5e)&&(nowseconds < ramp6s))LEDStartMode=1;
-  else if((ramp1e < ramp1s)&&(nowseconds > ramp6s)&&(nowseconds < ramp6e))LEDStartMode=9;
-  else if((ramp1e < ramp1s)&&(nowseconds > ramp6e)&&(nowseconds < ramp1s))LEDStartMode=0;
-
-  //ramp 2 starts after midnight
-  else if((ramp2s < ramp1e)&&(nowseconds > ramp1e))LEDStartMode=2;
-  else if((ramp2s < ramp1e)&&(nowseconds < ramp2s))LEDStartMode=2;
-  else if((ramp2s < ramp1e)&&(nowseconds > ramp2s)&&(nowseconds < ramp2e))LEDStartMode=5;
-  else if((ramp2s < ramp1e)&&(nowseconds > ramp2e)&&(nowseconds < ramp3s))LEDStartMode=3;
-  else if((ramp2s < ramp1e)&&(nowseconds > ramp3s)&&(nowseconds < ramp3e))LEDStartMode=6;
-  else if((ramp2s < ramp1e)&&(nowseconds > ramp3e)&&(nowseconds < ramp4s))LEDStartMode=2;
-  else if((ramp2s < ramp1e)&&(nowseconds > ramp4s)&&(nowseconds < ramp4e))LEDStartMode=7;
-  else if((ramp2s < ramp1e)&&(nowseconds > ramp4e)&&(nowseconds < ramp5s))LEDStartMode=0;
-  else if((ramp2s < ramp1e)&&(nowseconds > ramp5s)&&(nowseconds < ramp5e))LEDStartMode=8;
-  else if((ramp2s < ramp1e)&&(nowseconds > ramp5e)&&(nowseconds < ramp6s))LEDStartMode=1;
-  else if((ramp2s < ramp1e)&&(nowseconds > ramp6s)&&(nowseconds < ramp6e))LEDStartMode=9;
-  else if((ramp2s < ramp1e)&&(nowseconds > ramp6e)&&(nowseconds < ramp1s))LEDStartMode=0;
-  else if((ramp2s < ramp1e)&&(nowseconds > ramp1s)&&(nowseconds < ramp1e))LEDStartMode=4;
-  
-  //ramp 2 ends after midnight
-  else if((ramp2e < ramp2s)&&(nowseconds > ramp2s))LEDStartMode=5;
-  else if((ramp2e < ramp2s)&&(nowseconds < ramp2e))LEDStartMode=5;
-  else if((ramp2e < ramp2s)&&(nowseconds > ramp2e)&&(nowseconds < ramp3s))LEDStartMode=3;
-  else if((ramp2e < ramp2s)&&(nowseconds > ramp3s)&&(nowseconds < ramp3e))LEDStartMode=6;
-  else if((ramp2e < ramp2s)&&(nowseconds > ramp3e)&&(nowseconds < ramp4s))LEDStartMode=2;
-  else if((ramp2e < ramp2s)&&(nowseconds > ramp4s)&&(nowseconds < ramp4e))LEDStartMode=7;
-  else if((ramp2e < ramp2s)&&(nowseconds > ramp4e)&&(nowseconds < ramp5s))LEDStartMode=0;
-  else if((ramp2e < ramp2s)&&(nowseconds > ramp5s)&&(nowseconds < ramp5e))LEDStartMode=8;
-  else if((ramp2e < ramp2s)&&(nowseconds > ramp5e)&&(nowseconds < ramp6s))LEDStartMode=1;
-  else if((ramp2e < ramp2s)&&(nowseconds > ramp6s)&&(nowseconds < ramp6e))LEDStartMode=9;
-  else if((ramp2e < ramp2s)&&(nowseconds > ramp6e)&&(nowseconds < ramp1s))LEDStartMode=0;
-  else if((ramp2e < ramp2s)&&(nowseconds > ramp1s)&&(nowseconds < ramp1e))LEDStartMode=4;
-  else if((ramp2e < ramp2s)&&(nowseconds > ramp1e)&&(nowseconds < ramp2s))LEDStartMode=2;
-
-  //ramp 3 starts after midnight
-  else if((ramp3s < ramp2e)&&(nowseconds > ramp2e))LEDStartMode=3;
-  else if((ramp3s < ramp2e)&&(nowseconds < ramp3s))LEDStartMode=3;
-  else if((ramp3s < ramp2e)&&(nowseconds > ramp3s)&&(nowseconds < ramp3e))LEDStartMode=6;
-  else if((ramp3s < ramp2e)&&(nowseconds > ramp3e)&&(nowseconds < ramp4s))LEDStartMode=2;
-  else if((ramp3s < ramp2e)&&(nowseconds > ramp4s)&&(nowseconds < ramp4e))LEDStartMode=7;
-  else if((ramp3s < ramp2e)&&(nowseconds > ramp4e)&&(nowseconds < ramp5s))LEDStartMode=0;
-  else if((ramp3s < ramp2e)&&(nowseconds > ramp5s)&&(nowseconds < ramp5e))LEDStartMode=8;
-  else if((ramp3s < ramp2e)&&(nowseconds > ramp5e)&&(nowseconds < ramp6s))LEDStartMode=1;
-  else if((ramp3s < ramp2e)&&(nowseconds > ramp6s)&&(nowseconds < ramp6e))LEDStartMode=9;
-  else if((ramp3s < ramp2e)&&(nowseconds > ramp6e)&&(nowseconds < ramp1s))LEDStartMode=0;
-  else if((ramp3s < ramp2e)&&(nowseconds > ramp1s)&&(nowseconds < ramp1e))LEDStartMode=4;
-  else if((ramp3s < ramp2e)&&(nowseconds > ramp1e)&&(nowseconds < ramp2s))LEDStartMode=2;
-  else if((ramp3s < ramp2e)&&(nowseconds > ramp2s)&&(nowseconds < ramp2e))LEDStartMode=5;
-
-  //ramp 3 ends after midnight
-  else if((ramp3e < ramp3s)&&(nowseconds > ramp3s))LEDStartMode=6;
-  else if((ramp3e < ramp3s)&&(nowseconds < ramp3e))LEDStartMode=6;
-  else if((ramp3e < ramp3s)&&(nowseconds > ramp3e)&&(nowseconds < ramp4s))LEDStartMode=2;
-  else if((ramp3e < ramp3s)&&(nowseconds > ramp4s)&&(nowseconds < ramp4e))LEDStartMode=7;
-  else if((ramp3e < ramp3s)&&(nowseconds > ramp4e)&&(nowseconds < ramp5s))LEDStartMode=0;
-  else if((ramp3e < ramp3s)&&(nowseconds > ramp5s)&&(nowseconds < ramp5e))LEDStartMode=8;
-  else if((ramp3e < ramp3s)&&(nowseconds > ramp5e)&&(nowseconds < ramp6s))LEDStartMode=1;
-  else if((ramp3e < ramp3s)&&(nowseconds > ramp6s)&&(nowseconds < ramp6e))LEDStartMode=9;
-  else if((ramp3e < ramp3s)&&(nowseconds > ramp6e)&&(nowseconds < ramp1s))LEDStartMode=0;
-  else if((ramp3e < ramp3s)&&(nowseconds > ramp1s)&&(nowseconds < ramp1e))LEDStartMode=4;
-  else if((ramp3e < ramp3s)&&(nowseconds > ramp1e)&&(nowseconds < ramp2s))LEDStartMode=2;
-  else if((ramp3e < ramp3s)&&(nowseconds > ramp2s)&&(nowseconds < ramp2e))LEDStartMode=5;
-  else if((ramp3e < ramp3s)&&(nowseconds > ramp2e)&&(nowseconds < ramp3s))LEDStartMode=3;
-
-  //ramp 4 starts after midnight
-  else if((ramp4s < ramp3e)&&(nowseconds > ramp3e))LEDStartMode=2;
-  else if((ramp4s < ramp3e)&&(nowseconds < ramp4s))LEDStartMode=2;
-  else if((ramp4s < ramp3e)&&(nowseconds > ramp4s)&&(nowseconds < ramp4e))LEDStartMode=7;
-  else if((ramp4s < ramp3e)&&(nowseconds > ramp4e)&&(nowseconds < ramp5s))LEDStartMode=0;
-  else if((ramp4s < ramp3e)&&(nowseconds > ramp5s)&&(nowseconds < ramp5e))LEDStartMode=8;
-  else if((ramp4s < ramp3e)&&(nowseconds > ramp5e)&&(nowseconds < ramp6s))LEDStartMode=1;
-  else if((ramp4s < ramp3e)&&(nowseconds > ramp6s)&&(nowseconds < ramp6e))LEDStartMode=9;
-  else if((ramp4s < ramp3e)&&(nowseconds > ramp6e)&&(nowseconds < ramp1s))LEDStartMode=0;
-  else if((ramp4s < ramp3e)&&(nowseconds > ramp1s)&&(nowseconds < ramp1e))LEDStartMode=4;
-  else if((ramp4s < ramp3e)&&(nowseconds > ramp1e)&&(nowseconds < ramp2s))LEDStartMode=2;
-  else if((ramp4s < ramp3e)&&(nowseconds > ramp2s)&&(nowseconds < ramp2e))LEDStartMode=5;
-  else if((ramp4s < ramp3e)&&(nowseconds > ramp2e)&&(nowseconds < ramp3s))LEDStartMode=3;
-  else if((ramp4s < ramp3e)&&(nowseconds > ramp3s)&&(nowseconds < ramp3e))LEDStartMode=6;
-
-  //ramp 4 ends after midnight
-  else if((ramp4e < ramp4s)&&(nowseconds > ramp4s))LEDStartMode=7;
-  else if((ramp4e < ramp4s)&&(nowseconds < ramp4e))LEDStartMode=7;
-  else if((ramp4e < ramp4s)&&(nowseconds > ramp4e)&&(nowseconds < ramp5s))LEDStartMode=0;
-  else if((ramp4e < ramp4s)&&(nowseconds > ramp5s)&&(nowseconds < ramp5e))LEDStartMode=8;
-  else if((ramp4e < ramp4s)&&(nowseconds > ramp5e)&&(nowseconds < ramp6s))LEDStartMode=1;
-  else if((ramp4e < ramp4s)&&(nowseconds > ramp6s)&&(nowseconds < ramp6e))LEDStartMode=9;
-  else if((ramp4e < ramp4s)&&(nowseconds > ramp6e)&&(nowseconds < ramp1s))LEDStartMode=0;
-  else if((ramp4e < ramp4s)&&(nowseconds > ramp1s)&&(nowseconds < ramp1e))LEDStartMode=4;
-  else if((ramp4e < ramp4s)&&(nowseconds > ramp1e)&&(nowseconds < ramp2s))LEDStartMode=2;
-  else if((ramp4e < ramp4s)&&(nowseconds > ramp2s)&&(nowseconds < ramp2e))LEDStartMode=5;
-  else if((ramp4e < ramp4s)&&(nowseconds > ramp2e)&&(nowseconds < ramp3s))LEDStartMode=3;
-  else if((ramp4e < ramp4s)&&(nowseconds > ramp3s)&&(nowseconds < ramp3e))LEDStartMode=6;
-  else if((ramp4e < ramp4s)&&(nowseconds > ramp3e)&&(nowseconds < ramp4s))LEDStartMode=2;
-
-  //ramp 5 starts after midnight
-  else if((ramp5s < ramp4e)&&(nowseconds > ramp4e))LEDStartMode=0;
-  else if((ramp5s < ramp4e)&&(nowseconds < ramp5s))LEDStartMode=0;
-  else if((ramp5s < ramp4e)&&(nowseconds > ramp5s)&&(nowseconds < ramp5e))LEDStartMode=8;
-  else if((ramp5s < ramp4e)&&(nowseconds > ramp5e)&&(nowseconds < ramp6s))LEDStartMode=1;
-  else if((ramp5s < ramp4e)&&(nowseconds > ramp6s)&&(nowseconds < ramp6e))LEDStartMode=9;
-  else if((ramp5s < ramp4e)&&(nowseconds > ramp6e)&&(nowseconds < ramp1s))LEDStartMode=0;
-  else if((ramp5s < ramp4e)&&(nowseconds > ramp1s)&&(nowseconds < ramp1e))LEDStartMode=4;
-  else if((ramp5s < ramp4e)&&(nowseconds > ramp1e)&&(nowseconds < ramp2s))LEDStartMode=2;
-  else if((ramp5s < ramp4e)&&(nowseconds > ramp2s)&&(nowseconds < ramp2e))LEDStartMode=5;
-  else if((ramp5s < ramp4e)&&(nowseconds > ramp2e)&&(nowseconds < ramp3s))LEDStartMode=3;
-  else if((ramp5s < ramp4e)&&(nowseconds > ramp3s)&&(nowseconds < ramp3e))LEDStartMode=6;
-  else if((ramp5s < ramp4e)&&(nowseconds > ramp3e)&&(nowseconds < ramp4s))LEDStartMode=2;
-  else if((ramp5s < ramp4e)&&(nowseconds > ramp4s)&&(nowseconds < ramp4e))LEDStartMode=7;
-  
-  //ramp 5 ends after midnight
-  else if((ramp5e < ramp5s)&&(nowseconds > ramp5s))LEDStartMode=8;
-  else if((ramp5e < ramp5s)&&(nowseconds < ramp5e))LEDStartMode=8;
-  else if((ramp5e < ramp5s)&&(nowseconds > ramp5e)&&(nowseconds < ramp6s))LEDStartMode=1;
-  else if((ramp5e < ramp5s)&&(nowseconds > ramp6s)&&(nowseconds < ramp6e))LEDStartMode=9;
-  else if((ramp5e < ramp5s)&&(nowseconds > ramp6e)&&(nowseconds < ramp1s))LEDStartMode=0;
-  else if((ramp5e < ramp5s)&&(nowseconds > ramp1s)&&(nowseconds < ramp1e))LEDStartMode=4;
-  else if((ramp5e < ramp5s)&&(nowseconds > ramp1e)&&(nowseconds < ramp2s))LEDStartMode=2;
-  else if((ramp5e < ramp5s)&&(nowseconds > ramp2s)&&(nowseconds < ramp2e))LEDStartMode=5;
-  else if((ramp5e < ramp5s)&&(nowseconds > ramp2e)&&(nowseconds < ramp3s))LEDStartMode=3;
-  else if((ramp5e < ramp5s)&&(nowseconds > ramp3s)&&(nowseconds < ramp3e))LEDStartMode=6;
-  else if((ramp5e < ramp5s)&&(nowseconds > ramp3e)&&(nowseconds < ramp4s))LEDStartMode=2;
-  else if((ramp5e < ramp5s)&&(nowseconds > ramp4s)&&(nowseconds < ramp4e))LEDStartMode=7;
-  else if((ramp5e < ramp5s)&&(nowseconds > ramp4e)&&(nowseconds < ramp5s))LEDStartMode=0;
-  
-  //ramp 6 starts after midnight
-  else if((ramp6s < ramp5e)&&(nowseconds > ramp5e))LEDStartMode=1;
-  else if((ramp6s < ramp5e)&&(nowseconds < ramp6s))LEDStartMode=1;
-  else if((ramp6s < ramp5e)&&(nowseconds > ramp6s)&&(nowseconds < ramp6e))LEDStartMode=9;
-  else if((ramp6s < ramp5e)&&(nowseconds > ramp6e)&&(nowseconds < ramp1s))LEDStartMode=0;
-  else if((ramp6s < ramp5e)&&(nowseconds > ramp1s)&&(nowseconds < ramp1e))LEDStartMode=4;
-  else if((ramp6s < ramp5e)&&(nowseconds > ramp1e)&&(nowseconds < ramp2s))LEDStartMode=2;
-  else if((ramp6s < ramp5e)&&(nowseconds > ramp2s)&&(nowseconds < ramp2e))LEDStartMode=5;
-  else if((ramp6s < ramp5e)&&(nowseconds > ramp2e)&&(nowseconds < ramp3s))LEDStartMode=3;
-  else if((ramp6s < ramp5e)&&(nowseconds > ramp3s)&&(nowseconds < ramp3e))LEDStartMode=6;
-  else if((ramp6s < ramp5e)&&(nowseconds > ramp3e)&&(nowseconds < ramp4s))LEDStartMode=2;
-  else if((ramp6s < ramp5e)&&(nowseconds > ramp4s)&&(nowseconds < ramp4e))LEDStartMode=7;
-  else if((ramp6s < ramp5e)&&(nowseconds > ramp4e)&&(nowseconds < ramp5s))LEDStartMode=0;
-  else if((ramp6s < ramp5e)&&(nowseconds > ramp5s)&&(nowseconds < ramp5e))LEDStartMode=8;
-  
-  //ramp 6 ends after midnight
-  else if((ramp6e < ramp6s)&&(nowseconds > ramp6s))LEDStartMode=9;
-  else if((ramp6e < ramp6s)&&(nowseconds < ramp6e))LEDStartMode=9;
-  else if((ramp6e < ramp6s)&&(nowseconds > ramp6e)&&(nowseconds < ramp1s))LEDStartMode=0;
-  else if((ramp6e < ramp6s)&&(nowseconds > ramp1s)&&(nowseconds < ramp1e))LEDStartMode=4;
-  else if((ramp6e < ramp6s)&&(nowseconds > ramp1e)&&(nowseconds < ramp2s))LEDStartMode=2;
-  else if((ramp6e < ramp6s)&&(nowseconds > ramp2s)&&(nowseconds < ramp2e))LEDStartMode=5;
-  else if((ramp6e < ramp6s)&&(nowseconds > ramp2e)&&(nowseconds < ramp3s))LEDStartMode=3;
-  else if((ramp6e < ramp6s)&&(nowseconds > ramp3s)&&(nowseconds < ramp3e))LEDStartMode=6;
-  else if((ramp6e < ramp6s)&&(nowseconds > ramp3e)&&(nowseconds < ramp4s))LEDStartMode=2;
-  else if((ramp6e < ramp6s)&&(nowseconds > ramp4s)&&(nowseconds < ramp4e))LEDStartMode=7;
-  else if((ramp6e < ramp6s)&&(nowseconds > ramp4e)&&(nowseconds < ramp5s))LEDStartMode=0;
-  else if((ramp6e < ramp6s)&&(nowseconds > ramp5s)&&(nowseconds < ramp5e))LEDStartMode=8;
-  else if((ramp6e < ramp6s)&&(nowseconds > ramp5e)&&(nowseconds < ramp6s))LEDStartMode=1;
+  for(i=0 ; i < nowseconds ; i++)//go through the schedule up to the current time
+  {
+    if(i == sunriseSecond)LEDStartMode = 4;
+    if((i == (sunriseSecond + fadeTimeSeconds))&&(LEDStartMode == 4))LEDStartMode = 2;
+    if(i == startsecond)LEDStartMode = 5;
+    if((i == (startsecond + fadeTimeSeconds))&&(LEDStartMode == 5))LEDStartMode = 3;
+    if(i == stopsecond)LEDStartMode = 6;
+    if((i == (stopsecond + fadeTimeSeconds))&&(LEDStartMode == 6))LEDStartMode = 2;
+    if(i == sunsetSecond)LEDStartMode = 7;
+    if((i == (sunsetSecond + fadeTimeSeconds))&&(LEDStartMode == 7))LEDStartMode = 0;
+    if(i == moonStartSecond)LEDStartMode = 8;
+    if((i == (moonStartSecond + fadeTimeSeconds))&&(LEDStartMode == 8))LEDStartMode = 1;
+    if(i == moonStopSecond)LEDStartMode = 9;
+    if((i == (moonStopSecond + fadeTimeSeconds))&&(LEDStartMode == 9))LEDStartMode = 0;
+  }
+  if(LEDStartMode == 99)//if we don't hit a ramp, ie if it's 12:01AM, go backwards
+  {
+    i = 86399;
+    while((LEDStartMode == 99)&&(i > nowseconds))
+    {
+      if(i == sunriseSecond)LEDStartMode = 4;
+      if(i == (sunriseSecond + fadeTimeSeconds))LEDStartMode = 2;
+      if(i == startsecond)LEDStartMode = 5;
+      if(i == (startsecond + fadeTimeSeconds))LEDStartMode = 3;
+      if(i == stopsecond)LEDStartMode = 6;
+      if(i == (stopsecond + fadeTimeSeconds))LEDStartMode = 2;
+      if(i == sunsetSecond)LEDStartMode = 7;
+      if(i == (sunsetSecond + fadeTimeSeconds))LEDStartMode = 0;
+      if(i == moonStartSecond)LEDStartMode = 8;
+      if(i == (moonStartSecond + fadeTimeSeconds))LEDStartMode = 1;
+      if(i == moonStopSecond)LEDStartMode = 9;
+      if(i == (moonStopSecond + fadeTimeSeconds))LEDStartMode = 0;
+      i--;
+    }
+  }
   
   //set LEDs based on LEDStartMode
   if(LEDStartMode == 0)
@@ -758,15 +611,15 @@ void smartLEDStartup()
   {
     Serial.println("Setting lights to sunrise mode based on current time...");
     fadeInProgress = 4;
-    if(nowseconds > ramp1s) //normal operation
+    if(nowseconds > sunriseSecond) //normal operation
     {
-      fadeStartTimeSeconds = now() - (nowseconds - ramp1s);
-      fadeStartTimeMillis = millis() - ((nowseconds - ramp1s) * 1000);
+      fadeStartTimeSeconds = now() - (nowseconds - sunriseSecond);
+      fadeStartTimeMillis = millis() - ((nowseconds - sunriseSecond) * 1000);
     }
-    if(nowseconds < ramp1s) //ramp 1 started before midnight but currently after midnight
+    if(nowseconds < sunriseSecond) //ramp 1 started before midnight but currently after midnight
     {
-      fadeStartTimeSeconds = now() - (nowseconds + 86400 - ramp1s);
-      fadeStartTimeMillis = millis() - ((nowseconds + 86400 - ramp1s) * 1000);
+      fadeStartTimeSeconds = now() - (nowseconds + 86400 - sunriseSecond);
+      fadeStartTimeMillis = millis() - ((nowseconds + 86400 - sunriseSecond) * 1000);
     }
     for (i = 0; i < numCh; i = i + 1) {
       LEDsettings[i].targetPWM = LEDsettings[i].dimPWM;
@@ -780,15 +633,15 @@ void smartLEDStartup()
   {
     Serial.println("Setting lights to ramp up to daylight mode based on current time...");
     fadeInProgress = 5;
-    if(nowseconds > ramp2s) //normal operation
+    if(nowseconds > startsecond) //normal operation
     {
-      fadeStartTimeSeconds = now() - (nowseconds - ramp2s);
-      fadeStartTimeMillis = millis() - ((nowseconds - ramp2s) * 1000);
+      fadeStartTimeSeconds = now() - (nowseconds - startsecond);
+      fadeStartTimeMillis = millis() - ((nowseconds - startsecond) * 1000);
     }
-    if(nowseconds < ramp2s) //ramp 2 started before midnight but currently after midnight
+    if(nowseconds < startsecond) //ramp 2 started before midnight but currently after midnight
     {
-      fadeStartTimeSeconds = now() - (nowseconds + 86400 - ramp2s);
-      fadeStartTimeMillis = millis() - ((nowseconds + 86400 - ramp2s) * 1000);
+      fadeStartTimeSeconds = now() - (nowseconds + 86400 - startsecond);
+      fadeStartTimeMillis = millis() - ((nowseconds + 86400 - startsecond) * 1000);
     }
     for (i = 0; i < numCh; i = i + 1)
     {
@@ -803,15 +656,15 @@ void smartLEDStartup()
   {
     Serial.println("Setting lights to ramp down from daylight based on current time...");
     fadeInProgress = 6;
-    if(nowseconds > ramp3s) //normal operation
+    if(nowseconds > stopsecond) //normal operation
     {
-      fadeStartTimeSeconds = now() - (nowseconds - ramp3s);
-      fadeStartTimeMillis = millis() - ((nowseconds - ramp3s) * 1000);
+      fadeStartTimeSeconds = now() - (nowseconds - stopsecond);
+      fadeStartTimeMillis = millis() - ((nowseconds - stopsecond) * 1000);
     }
-    if(nowseconds < ramp3s) //ramp 3 started before midnight but currently after midnight
+    if(nowseconds < stopsecond) //ramp 3 started before midnight but currently after midnight
     {
-      fadeStartTimeSeconds = now() - (nowseconds + 86400 - ramp3s);
-      fadeStartTimeMillis = millis() - ((nowseconds + 86400 - ramp3s) * 1000);
+      fadeStartTimeSeconds = now() - (nowseconds + 86400 - stopsecond);
+      fadeStartTimeMillis = millis() - ((nowseconds + 86400 - stopsecond) * 1000);
     }
     for (i = 0; i < numCh; i = i + 1)
     {
@@ -826,15 +679,15 @@ void smartLEDStartup()
   {
     Serial.println("Setting lights to sunset mode based on current time...");
     fadeInProgress = 7;
-    if(nowseconds > ramp4s) //normal operation
+    if(nowseconds > sunsetSecond) //normal operation
     {
-      fadeStartTimeSeconds = now() - (nowseconds - ramp4s);
-      fadeStartTimeMillis = millis() - ((nowseconds - ramp4s) * 1000);
+      fadeStartTimeSeconds = now() - (nowseconds - sunsetSecond);
+      fadeStartTimeMillis = millis() - ((nowseconds - sunsetSecond) * 1000);
     }
-    if(nowseconds < ramp4s) //ramp 4 started before midnight but currently after midnight
+    if(nowseconds < sunsetSecond) //ramp 4 started before midnight but currently after midnight
     {
-      fadeStartTimeSeconds = now() - (nowseconds + 86400 - ramp4s);
-      fadeStartTimeMillis = millis() - ((nowseconds + 86400 - ramp4s) * 1000);
+      fadeStartTimeSeconds = now() - (nowseconds + 86400 - sunsetSecond);
+      fadeStartTimeMillis = millis() - ((nowseconds + 86400 - sunsetSecond) * 1000);
     }
     for (i = 0; i < numCh; i = i + 1)
     {
@@ -849,15 +702,15 @@ void smartLEDStartup()
   {
     Serial.println("Setting lights to moonrise mode based on current time...");
     fadeInProgress = 8;
-    if(nowseconds > ramp5s) //normal operation
+    if(nowseconds > moonStartSecond) //normal operation
     {
-      fadeStartTimeSeconds = now() - (nowseconds - ramp5s);
-      fadeStartTimeMillis = millis() - ((nowseconds - ramp5s) * 1000);
+      fadeStartTimeSeconds = now() - (nowseconds - moonStartSecond);
+      fadeStartTimeMillis = millis() - ((nowseconds - moonStartSecond) * 1000);
     }
-    if(nowseconds < ramp5s) //ramp 5 started before midnight but currently after midnight
+    if(nowseconds < moonStartSecond) //ramp 5 started before midnight but currently after midnight
     {
-      fadeStartTimeSeconds = now() - (nowseconds + 86400 - ramp5s);
-      fadeStartTimeMillis = millis() - ((nowseconds + 86400 - ramp5s) * 1000);
+      fadeStartTimeSeconds = now() - (nowseconds + 86400 - moonStartSecond);
+      fadeStartTimeMillis = millis() - ((nowseconds + 86400 - moonStartSecond) * 1000);
     }
     for (i = 0; i < numCh; i = i + 1)
     {
@@ -872,15 +725,15 @@ void smartLEDStartup()
   {
     Serial.println("Setting lights to moonfall mode based on current time...");
     fadeInProgress = 9;
-    if(nowseconds > ramp6s) //normal operation
+    if(nowseconds > moonStopSecond) //normal operation
     {
-      fadeStartTimeSeconds = now() - (nowseconds - ramp6s);
-      fadeStartTimeMillis = millis() - ((nowseconds - ramp6s) * 1000);
+      fadeStartTimeSeconds = now() - (nowseconds - moonStopSecond);
+      fadeStartTimeMillis = millis() - ((nowseconds - moonStopSecond) * 1000);
     }
-    if(nowseconds < ramp6s) //ramp 5 started before midnight but currently after midnight
+    if(nowseconds < moonStopSecond) //ramp started before midnight but currently after midnight
     {
-      fadeStartTimeSeconds = now() - (nowseconds + 86400 - ramp6s);
-      fadeStartTimeMillis = millis() - ((nowseconds + 86400 - ramp6s) * 1000);
+      fadeStartTimeSeconds = now() - (nowseconds + 86400 - moonStopSecond);
+      fadeStartTimeMillis = millis() - ((nowseconds + 86400 - moonStopSecond) * 1000);
     }
     for (i = 0; i < numCh; i = i + 1)
     {
