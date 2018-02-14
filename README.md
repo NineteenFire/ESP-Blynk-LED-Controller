@@ -28,3 +28,14 @@ Parts needed:
 
 ### Custom driver PCB
 ![Custom driver PCB](https://i.imgur.com/vgvPy1l.png)
+
+## Libraries
+
+- [Adafruit PWM Servo Driver](https://github.com/adafruit/Adafruit-PWM-Servo-Driver-Library)
+- [Arduino JSON](https://arduinojson.org/doc/installation/)
+- [Arduino OTA](https://github.com/esp8266/Arduino/tree/master/libraries/ArduinoOTA)
+- [Blynk](https://github.com/blynkkk/blynk-library)
+- [Dallas Temperature](https://github.com/milesburton/Arduino-Temperature-Control-Library)
+- [Simple Timer](https://github.com/marcelloromani/Arduino-SimpleTimer/tree/master/SimpleTimer)
+- [Time Library](https://github.com/PaulStoffregen/Time)
+- [Wifi Manager](https://github.com/tzapu/WiFiManager)
