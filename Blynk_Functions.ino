@@ -10,6 +10,33 @@ BLYNK_CONNECTED()
     Blynk.run();
   }
 }
+// This is called when Smartphone App is opened
+BLYNK_APP_CONNECTED() {
+  Serial.println("App Connected.");
+  appConnected = true;
+  int value;
+  value = map(LEDsettings[0].currentPWM, 0, 4095, 0, 1000);
+  Blynk.virtualWrite(V0, value);
+  value = map(LEDsettings[1].currentPWM, 0, 4095, 0, 1000);
+  Blynk.virtualWrite(V1, value);
+  Blynk.run();
+  value = map(LEDsettings[2].currentPWM, 0, 4095, 0, 1000);
+  Blynk.virtualWrite(V2, value);
+  value = map(LEDsettings[3].currentPWM, 0, 4095, 0, 1000);
+  Blynk.virtualWrite(V3, value);
+  Blynk.run();
+  value = map(LEDsettings[4].currentPWM, 0, 4095, 0, 1000);
+  Blynk.virtualWrite(V4, value);
+  value = map(LEDsettings[5].currentPWM, 0, 4095, 0, 1000);
+  Blynk.virtualWrite(V5, value);
+  Blynk.run();
+}
+
+// This is called when Smartphone App is closed
+BLYNK_APP_DISCONNECTED() {
+  Serial.println("App Disconnected.");
+  appConnected = false;
+}
 BLYNK_WRITE(V0) {// slider widget to set the maximum led level from the Blynk App.
   int value = param.asInt();
   value = map(value, 0, 1000, 0, 4095);
@@ -191,7 +218,7 @@ BLYNK_WRITE(V15) {// menu input to select LED mode
       smartLEDStartup();
     }
     for (i = 0; i < numCh; i = i + 1){
-        LEDsettings[i].tempPWM = 0;
+        LEDsettings[i].tempPWM = LEDsettings[i].currentPWM;
       }
   }
   if(LEDMode == 2)
