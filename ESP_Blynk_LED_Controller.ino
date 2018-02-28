@@ -1,3 +1,6 @@
+/*
+ * To do: update sliders during normal operation?  This may cause too much traffic
+ */
 #include <FS.h>                   // https://github.com/tzapu/WiFiManager This Library needs to be included FIRST!
 #define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
 #include <BlynkSimpleEsp8266.h>
@@ -27,6 +30,7 @@ byte pOnBoardLED=2;
 char blynk_token[34] = "BLYNK_TOKEN";//added from WiFiManager - AutoConnectWithFSParameters
 //flag for saving data
 bool shouldSaveConfig = false;
+bool appConnected = false;
 
 //callback notifying the need to save config
 void saveConfigCallback () {
@@ -428,6 +432,41 @@ void checkSchedule()        // check if ramping should start
       if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM){difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);}
       if(LEDsettings[i].targetPWM < LEDsettings[i].lastPWM){difference = (LEDsettings[i].lastPWM - LEDsettings[i].targetPWM);}
       LEDsettings[i].fadeIncrementTime = fadeTimeMillis / difference;
+    }
+  }
+  if(appConnected)
+  {
+    //if we're in normal mode keep the sliders updated
+    if(LEDMode == 1) //normal operation
+    {
+      unsigned int sliderToUpdate = nowseconds % numCh;
+      unsigned int value;
+      switch (sliderToUpdate) {
+        case 0:
+          value = map(LEDsettings[0].currentPWM, 0, 4095, 0, 1000);
+          Blynk.virtualWrite(V0, value);
+          break;
+        case 1:
+          value = map(LEDsettings[1].currentPWM, 0, 4095, 0, 1000);
+          Blynk.virtualWrite(V1, value);
+          break;
+        case 2:
+          value = map(LEDsettings[2].currentPWM, 0, 4095, 0, 1000);
+          Blynk.virtualWrite(V2, value);
+          break;
+        case 3:
+          value = map(LEDsettings[3].currentPWM, 0, 4095, 0, 1000);
+          Blynk.virtualWrite(V3, value);
+          break;
+        case 4:
+          value = map(LEDsettings[4].currentPWM, 0, 4095, 0, 1000);
+          Blynk.virtualWrite(V4, value);
+          break;
+        case 5:
+          value = map(LEDsettings[5].currentPWM, 0, 4095, 0, 1000);
+          Blynk.virtualWrite(V5, value);
+          break;
+      }
     }
   }
 }
