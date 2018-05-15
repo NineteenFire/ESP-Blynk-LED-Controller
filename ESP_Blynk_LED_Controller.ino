@@ -2,7 +2,6 @@
 
 #include <FS.h>                   // https://github.com/tzapu/WiFiManager This Library needs to be included FIRST!
 #include <BlynkSimpleEsp8266.h>
-#include <SimpleTimer.h>
 #include <ArduinoOTA.h>
 #include <TimeLib.h>
 #include <WidgetRTC.h>
@@ -32,7 +31,6 @@ char blynk_token[34] = "BLYNK_TOKEN";//added from WiFiManager - AutoConnectWithF
 bool shouldSaveConfig = false;
 //callback notifying the need to save config
 void saveConfigCallback () {
-  //Serial.println("Should save config");
   BLYNK_LOG("Should save config");
   shouldSaveConfig = true;
 }
@@ -87,12 +85,11 @@ DallasTemperature sensors(&oneWire);
 // array to hold device addresses (can increase array length if using more sensors)
 DeviceAddress tempSensors[3];
 int numTempSensors;
-
 int fanOnTemp = 0;
 
 WidgetRTC rtc;
 WidgetLED fanLED(V14);
-SimpleTimer timer;
+BlynkTimer timer;
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
 void setup()
@@ -116,12 +113,12 @@ void setup()
   sensors.begin();
   // locate devices on the bus
   numTempSensors = sensors.getDeviceCount();
-  BLYNK_LOG("Found %d temperature sensors.\n",numTempSensors);
+  BLYNK_LOG("Found %d temperature sensors.",numTempSensors);
   for( int i = 0 ; i < numTempSensors ; i++)
   {
     if (!sensors.getAddress(tempSensors[i], i))
     {
-      BLYNK_LOG("Unable to find address for Device %d\n",i);
+      BLYNK_LOG("Unable to find address for Device %d",i);
     }
   }
 
@@ -130,16 +127,16 @@ void setup()
   //SPIFFS.format();
 
   //read configuration from FS json
-  Serial.println("mounting FS...");
+  BLYNK_LOG("Mounting FS...");
 
   if (SPIFFS.begin()) {
-    Serial.println("mounted file system");
+    BLYNK_LOG("Mounted file system");
     if (SPIFFS.exists("/config.json")) {
       //file exists, reading and loading
-      Serial.println("reading config file");
+      BLYNK_LOG("Config file exists");
       File configFile = SPIFFS.open("/config.json", "r");
       if (configFile) {
-        Serial.println("opened config file");
+        BLYNK_LOG("Opened config file");
         size_t size = configFile.size();
         // Allocate a buffer to store contents of the file.
         std::unique_ptr<char[]> buf(new char[size]);
@@ -149,18 +146,18 @@ void setup()
         JsonObject& json = jsonBuffer.parseObject(buf.get());
         json.printTo(Serial);
         if (json.success()) {
-          Serial.println("\nparsed json");
+          BLYNK_LOG("Parsed json");
           strcpy(blynk_token, json["blynk_token"]);
-          BLYNK_LOG("Blynk Token in memory: %s\n",blynk_token);
+          BLYNK_LOG("Blynk Token in memory: %s",blynk_token);
         } else {
-          Serial.println("failed to load json config");
+          BLYNK_LOG("Failed to load json config");
         }
       }
     }else{
-      BLYNK_LOG("File config.json does not exist\n",blynk_token);
+      BLYNK_LOG("File config.json does not exist",blynk_token);
     }
   } else {
-    Serial.println("failed to mount FS");
+    BLYNK_LOG("Failed to mount FS");
   }
   //end read
   
@@ -194,7 +191,7 @@ void setup()
   //and goes into a blocking loop awaiting configuration
   if (!wifiManager.autoConnect("LED AP")) {
     //Serial.println("failed to connect and hit timeout");
-    BLYNK_LOG("failed to connect and hit timeout\n");
+    BLYNK_LOG("Failed to connect and hit timeout");
     delay(3000);
     //reset and try again, or maybe put it to deep sleep
     ESP.reset();
@@ -202,22 +199,21 @@ void setup()
   }
 
   //if you get here you have connected to the WiFi
-  //Serial.println("LED Controller connected :)");
-  BLYNK_LOG("LED Controller connected :)\n");
+  BLYNK_LOG("LED Controller connected :)");
 
   //read updated parameters
   strcpy(blynk_token, custom_blynk_token.getValue());
 
   //save the custom parameters to FS
   if (shouldSaveConfig) {
-    Serial.println("saving config");
+    BLYNK_LOG("Saving config");
     DynamicJsonBuffer jsonBuffer;
     JsonObject& json = jsonBuffer.createObject();
     json["blynk_token"] = blynk_token;
 
     File configFile = SPIFFS.open("/config.json", "w");
     if (!configFile) {
-      Serial.println("failed to open config file for writing");
+      BLYNK_LOG("failed to open config file for writing");
     }
 
     json.printTo(Serial);
@@ -231,14 +227,18 @@ void setup()
   while (Blynk.connect() == false)
   {
     // Wait until connected, need to handle case where wifi connects but blynk auth invalid...
-    /*
+    
     if((shouldSaveConfig == false)&&(blynk_token == "BLYNK_TOKEN"))
     {
       //This will erase WiFi settings forcing a new AP where Blynk_token can be entered
-      WiFi.disconnect(true); 
-      ESP.reset();
+      //WiFi.disconnect(true); 
+      //ESP.reset();
+      //OR
+      WiFi.begin("FakeSSID","FakePW");     // Replace current WiFi credentials with fake ones
+      delay(1000);
+      ESP.restart();
     }
-    */
+    
   }
   rtc.begin();
 
@@ -267,7 +267,7 @@ void setup()
   
   digitalWrite(pOnBoardLED, HIGH); //ensure light is OFF
   Blynk.notify("LED Controller ONLINE");
-  BLYNK_LOG("End of startup.\n");
+  BLYNK_LOG("End of startup.");
 }
 void loop()
 {
@@ -325,7 +325,7 @@ void checkSchedule()        // check if ramping should start
   if((nowseconds == sunriseSecond)&&(fadeInProgress != 4)) //ramp from 0 to sunrise values
   {
     sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
-    BLYNK_LOG("%s\tStarting sunrise...\n",Time);
+    BLYNK_LOG("%s\tStarting sunrise...",Time);
     
     fadeInProgress = 4;
     fadeStartTimeMillis = millis();
@@ -341,7 +341,7 @@ void checkSchedule()        // check if ramping should start
   else if((nowseconds == startsecond)&&(fadeInProgress != 5)) //ramp from sunrise to max 
   {
     sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
-    BLYNK_LOG("%s\tRamping to full brightness...\n",Time);
+    BLYNK_LOG("%s\tRamping to full brightness...",Time);
     
     fadeInProgress = 5;
     fadeStartTimeMillis = millis();
@@ -357,7 +357,7 @@ void checkSchedule()        // check if ramping should start
   else if((nowseconds == stopsecond)&&(fadeInProgress != 6)) //ramp from max to sunset values
   {
     sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
-    BLYNK_LOG("%s\tStarting sunset...\n",Time);
+    BLYNK_LOG("%s\tStarting sunset...",Time);
     
     fadeInProgress = 6;
     fadeStartTimeMillis = millis();
@@ -373,7 +373,7 @@ void checkSchedule()        // check if ramping should start
   else if((nowseconds == sunsetSecond)&&(fadeInProgress != 7)) //ramp from sunset to off
   {
     sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
-    BLYNK_LOG("%s\tRamping LEDs off...\n",Time);
+    BLYNK_LOG("%s\tRamping LEDs off...",Time);
     
     fadeInProgress = 7;
     fadeStartTimeMillis = millis();
@@ -389,7 +389,7 @@ void checkSchedule()        // check if ramping should start
   else if((nowseconds == moonStartSecond)&&(fadeInProgress != 8)) //ramp from off to moon
   {
     sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
-    BLYNK_LOG("%s\tRamping LEDs to moonlight...\n",Time);
+    BLYNK_LOG("%s\tRamping LEDs to moonlight...",Time);
     
     fadeInProgress = 8;
     fadeStartTimeMillis = millis();
@@ -405,7 +405,7 @@ void checkSchedule()        // check if ramping should start
   else if((nowseconds == moonStopSecond)&&(fadeInProgress != 9)) //ramp off from moon
   {
     sprintf(Time, "%02d:%02d:%02d", hour() , minute(), second());
-    BLYNK_LOG("%s\tRamping LEDs to moonlight...\n",Time);
+    BLYNK_LOG("%s\tRamping LEDs to moonlight...",Time);
     
     fadeInProgress = 9;
     fadeStartTimeMillis = millis();
@@ -521,10 +521,10 @@ void smartLEDStartup()
 {
   int i = 0;
   int difference;
-  int secondsIntoRamp;
+  int secondsIntoRamp = 0;
   unsigned long tempFadeTimeMillis;
   nowseconds = ((hour() * 3600) + (minute() * 60) + second());
-  BLYNK_LOG("nowseconds: %d\n", nowseconds);
+  BLYNK_LOG("nowseconds: %d", nowseconds);
 
   //0=off, 1=moonPWM, 2=dimPWM, 3=maxPWM, 
   //4=Ramp off->dim, 5=Ramp dim->max, 6=Ramp max->dim, 7=Ramp dim->off, 8=Ramp off->moon, 9=Ramp moon->off
@@ -543,18 +543,19 @@ void smartLEDStartup()
 
   for(i=0 ; i < nowseconds ; i++)//go through the schedule up to the current time
   {
-    if(i == sunriseSecond)LEDStartMode = 4;
+    if(i == sunriseSecond){LEDStartMode = 4;secondsIntoRamp = 0;}
     if((i == (sunriseSecond + fadeTimeSeconds))&&(LEDStartMode == 4))LEDStartMode = 2;
-    if(i == startsecond)LEDStartMode = 5;
+    if(i == startsecond){LEDStartMode = 5;secondsIntoRamp = 0;}
     if((i == (startsecond + fadeTimeSeconds))&&(LEDStartMode == 5))LEDStartMode = 3;
-    if(i == stopsecond)LEDStartMode = 6;
+    if(i == stopsecond){LEDStartMode = 6;secondsIntoRamp = 0;}
     if((i == (stopsecond + fadeTimeSeconds))&&(LEDStartMode == 6))LEDStartMode = 2;
-    if(i == sunsetSecond)LEDStartMode = 7;
+    if(i == sunsetSecond){LEDStartMode = 7;secondsIntoRamp = 0;}
     if((i == (sunsetSecond + fadeTimeSeconds))&&(LEDStartMode == 7))LEDStartMode = 0;
-    if(i == moonStartSecond)LEDStartMode = 8;
+    if(i == moonStartSecond){LEDStartMode = 8;secondsIntoRamp = 0;}
     if((i == (moonStartSecond + fadeTimeSeconds))&&(LEDStartMode == 8))LEDStartMode = 1;
-    if(i == moonStopSecond)LEDStartMode = 9;
+    if(i == moonStopSecond){LEDStartMode = 9;secondsIntoRamp = 0;}
     if((i == (moonStopSecond + fadeTimeSeconds))&&(LEDStartMode == 9))LEDStartMode = 0;
+    secondsIntoRamp++;
   }
   if(LEDStartMode == 99)//if we don't hit a ramp, ie if it's 12:01AM, go backwards
   {
@@ -573,6 +574,7 @@ void smartLEDStartup()
       if(i == (moonStartSecond + fadeTimeSeconds))LEDStartMode = 1;
       if(i == moonStopSecond)LEDStartMode = 9;
       if(i == (moonStopSecond + fadeTimeSeconds))LEDStartMode = 0;
+      secondsIntoRamp = 86400 - i;
       i--;
     }
   }
@@ -580,49 +582,82 @@ void smartLEDStartup()
   //set LEDs based on LEDStartMode
   if(LEDStartMode == 0)
   {
-    BLYNK_LOG("Setting lights off based on current time...\n");
+    BLYNK_LOG("Setting lights off based on current time...");
     for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = 0;}
     fadeInProgress = 0;
-    writeLEDs();
   }
-  if(LEDStartMode == 1)
+  else if(LEDStartMode == 1)
   {
-    BLYNK_LOG("Setting lights to moonlight mode based on current time...\n");
+    BLYNK_LOG("Setting lights to moonlight mode based on current time...");
     for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].moonPWM;}
     fadeInProgress = 0;
-    writeLEDs();
   }
-  if(LEDStartMode == 2)
+  else if(LEDStartMode == 2)
   {
-    BLYNK_LOG("Setting lights to sunrise/set levels based on current time...\n");
+    BLYNK_LOG("Setting lights to sunrise/set levels based on current time...");
     for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].dimPWM;}
     fadeInProgress = 0;
-    writeLEDs();
   }
-  if(LEDStartMode == 3)
+  else if(LEDStartMode == 3)
   {
-    BLYNK_LOG("Setting lights to daylight levels based on current time...\n");
+    BLYNK_LOG("Setting lights to daylight levels based on current time...");
     for (i = 0; i < numCh; i = i + 1){LEDsettings[i].currentPWM = LEDsettings[i].maxPWM;}
     fadeInProgress = 0;
-    writeLEDs();
   }
-  if(LEDStartMode == 4)
+  else //if we're mid ramp
   {
-    BLYNK_LOG("Setting lights to sunrise mode based on current time...\n");
-    fadeInProgress = 4;
-    //calculate how far into the ramp we are
-    if(nowseconds > sunriseSecond) //normal operation
+    fadeInProgress = LEDStartMode;
+    if(LEDStartMode == 4)
     {
-      secondsIntoRamp = nowseconds - sunriseSecond;
+      BLYNK_LOG("Setting lights to sunrise mode based on current time...");
+      for (i = 0; i < numCh; i = i + 1) {
+        LEDsettings[i].targetPWM = LEDsettings[i].dimPWM;
+        LEDsettings[i].lastPWM = 0;
+      }
     }
-    if(nowseconds < sunriseSecond) //ramp 1 started before midnight but currently after midnight
+    if(LEDStartMode == 5)
     {
-      secondsIntoRamp = nowseconds + (86400 - sunriseSecond);
+      BLYNK_LOG("Setting lights to ramp up to daylight mode based on current time...");
+      for (i = 0; i < numCh; i = i + 1) {
+        LEDsettings[i].targetPWM = LEDsettings[i].maxPWM;
+        LEDsettings[i].lastPWM = LEDsettings[i].dimPWM;
+      }
     }
+    if(LEDStartMode == 6)
+    {
+      BLYNK_LOG("Setting lights to ramp down from daylight based on current time...");
+      for (i = 0; i < numCh; i = i + 1) {
+        LEDsettings[i].targetPWM = LEDsettings[i].dimPWM;
+        LEDsettings[i].lastPWM = LEDsettings[i].maxPWM;
+      }
+    }
+    if(LEDStartMode == 7)
+    {
+      BLYNK_LOG("Setting lights to sunset mode based on current time...");
+      for (i = 0; i < numCh; i = i + 1) {
+        LEDsettings[i].targetPWM = 0;
+        LEDsettings[i].lastPWM = LEDsettings[i].dimPWM;
+      }
+    }
+    if(LEDStartMode == 8)
+    {
+      BLYNK_LOG("Setting lights to moonrise mode based on current time...");
+      for (i = 0; i < numCh; i = i + 1) {
+        LEDsettings[i].targetPWM = LEDsettings[i].moonPWM;
+        LEDsettings[i].lastPWM = 0;
+      }
+    }
+    if(LEDStartMode == 9)
+    {
+      BLYNK_LOG("Setting lights to moonfall mode based on current time...");
+      for (i = 0; i < numCh; i = i + 1) {
+        LEDsettings[i].targetPWM = 0;
+        LEDsettings[i].lastPWM = LEDsettings[i].moonPWM;
+      }
+    }
+    
     //calculate currentPWM based on where we are in ramp
     for (i = 0; i < numCh; i = i + 1) {
-      LEDsettings[i].targetPWM = LEDsettings[i].dimPWM;
-      LEDsettings[i].lastPWM = 0;
       if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM)
       {
         difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);
@@ -639,193 +674,13 @@ void smartLEDStartup()
     fadeStartTimeSeconds = now();
     tempFadeTimeMillis = (fadeTimeSeconds - secondsIntoRamp)*1000;
     for (i = 0; i < numCh; i = i + 1) {
-      LEDsettings[i].targetPWM = LEDsettings[i].dimPWM;
       LEDsettings[i].lastPWM = LEDsettings[i].currentPWM;
       if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM){difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);}
       if(LEDsettings[i].targetPWM < LEDsettings[i].lastPWM){difference = (LEDsettings[i].lastPWM - LEDsettings[i].targetPWM);}
       LEDsettings[i].fadeIncrementTime = tempFadeTimeMillis / difference;
     }
   }
-  if(LEDStartMode == 5)
-  {
-    BLYNK_LOG("Setting lights to ramp up to daylight mode based on current time...\n");
-    fadeInProgress = 5;
-    
-    //calculate how far into the ramp we are
-    if(nowseconds > startsecond){secondsIntoRamp = nowseconds - startsecond;}
-    if(nowseconds < startsecond){secondsIntoRamp = nowseconds + (86400 - startsecond);}
-    
-    //calculate currentPWM based on where we are in ramp
-    for (i = 0; i < numCh; i = i + 1) {
-      LEDsettings[i].targetPWM = LEDsettings[i].maxPWM;
-      LEDsettings[i].lastPWM = LEDsettings[i].dimPWM;
-      if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM)
-      {
-        difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);
-        LEDsettings[i].currentPWM = LEDsettings[i].lastPWM + ((difference * secondsIntoRamp) / fadeTimeSeconds);
-      }
-      if(LEDsettings[i].targetPWM < LEDsettings[i].lastPWM)
-      {
-        difference = (LEDsettings[i].lastPWM - LEDsettings[i].targetPWM);
-        LEDsettings[i].currentPWM = LEDsettings[i].lastPWM - ((difference * secondsIntoRamp) / fadeTimeSeconds);
-      }
-    }
-    //start a new ramp beginning at current time using time remaining of ramp
-    fadeStartTimeMillis = millis();
-    fadeStartTimeSeconds = now();
-    tempFadeTimeMillis = (fadeTimeSeconds - secondsIntoRamp)*1000;
-    for (i = 0; i < numCh; i = i + 1) {
-      LEDsettings[i].targetPWM = LEDsettings[i].maxPWM;
-      LEDsettings[i].lastPWM = LEDsettings[i].currentPWM;
-      if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM){difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);}
-      if(LEDsettings[i].targetPWM < LEDsettings[i].lastPWM){difference = (LEDsettings[i].lastPWM - LEDsettings[i].targetPWM);}
-      LEDsettings[i].fadeIncrementTime = tempFadeTimeMillis / difference;
-    }
-  }
-  if(LEDStartMode == 6)
-  {
-    BLYNK_LOG("Setting lights to ramp down from daylight based on current time...\n");
-    fadeInProgress = 6;
-
-    //calculate how far into the ramp we are
-    if(nowseconds > stopsecond){secondsIntoRamp = nowseconds - stopsecond;}
-    if(nowseconds < stopsecond){secondsIntoRamp = nowseconds + (86400 - stopsecond);}
-    
-    //calculate currentPWM based on where we are in ramp
-    for (i = 0; i < numCh; i = i + 1) {
-      LEDsettings[i].targetPWM = LEDsettings[i].dimPWM;
-      LEDsettings[i].lastPWM = LEDsettings[i].maxPWM;
-      if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM)
-      {
-        difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);
-        LEDsettings[i].currentPWM = LEDsettings[i].lastPWM + ((difference * secondsIntoRamp) / fadeTimeSeconds);
-      }
-      if(LEDsettings[i].targetPWM < LEDsettings[i].lastPWM)
-      {
-        difference = (LEDsettings[i].lastPWM - LEDsettings[i].targetPWM);
-        LEDsettings[i].currentPWM = LEDsettings[i].lastPWM - ((difference * secondsIntoRamp) / fadeTimeSeconds);
-      }
-    }
-    //start a new ramp beginning at current time using time remaining of ramp
-    fadeStartTimeMillis = millis();
-    fadeStartTimeSeconds = now();
-    tempFadeTimeMillis = (fadeTimeSeconds - secondsIntoRamp)*1000;
-    for (i = 0; i < numCh; i = i + 1) {
-      LEDsettings[i].targetPWM = LEDsettings[i].dimPWM;
-      LEDsettings[i].lastPWM = LEDsettings[i].currentPWM;
-      if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM){difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);}
-      if(LEDsettings[i].targetPWM < LEDsettings[i].lastPWM){difference = (LEDsettings[i].lastPWM - LEDsettings[i].targetPWM);}
-      LEDsettings[i].fadeIncrementTime = tempFadeTimeMillis / difference;
-    }
-  }
-  if(LEDStartMode == 7)
-  {
-    BLYNK_LOG("Setting lights to sunset mode based on current time...\n");
-    fadeInProgress = 7;
-
-    //calculate how far into the ramp we are
-    if(nowseconds > sunsetSecond){secondsIntoRamp = nowseconds - sunsetSecond;}
-    if(nowseconds < sunsetSecond){secondsIntoRamp = nowseconds + (86400 - sunsetSecond);}
-    
-    //calculate currentPWM based on where we are in ramp
-    for (i = 0; i < numCh; i = i + 1) {
-      LEDsettings[i].targetPWM = 0;
-      LEDsettings[i].lastPWM = LEDsettings[i].dimPWM;
-      if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM)
-      {
-        difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);
-        LEDsettings[i].currentPWM = LEDsettings[i].lastPWM + ((difference * secondsIntoRamp) / fadeTimeSeconds);
-      }
-      if(LEDsettings[i].targetPWM < LEDsettings[i].lastPWM)
-      {
-        difference = (LEDsettings[i].lastPWM - LEDsettings[i].targetPWM);
-        LEDsettings[i].currentPWM = LEDsettings[i].lastPWM - ((difference * secondsIntoRamp) / fadeTimeSeconds);
-      }
-    }
-    //start a new ramp beginning at current time using time remaining of ramp
-    fadeStartTimeMillis = millis();
-    fadeStartTimeSeconds = now();
-    tempFadeTimeMillis = (fadeTimeSeconds - secondsIntoRamp)*1000;
-    for (i = 0; i < numCh; i = i + 1) {
-      LEDsettings[i].targetPWM = 0;
-      LEDsettings[i].lastPWM = LEDsettings[i].currentPWM;
-      if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM){difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);}
-      if(LEDsettings[i].targetPWM < LEDsettings[i].lastPWM){difference = (LEDsettings[i].lastPWM - LEDsettings[i].targetPWM);}
-      LEDsettings[i].fadeIncrementTime = tempFadeTimeMillis / difference;
-    }
-  }
-  if(LEDStartMode == 8)
-  {
-    BLYNK_LOG("Setting lights to moonrise mode based on current time...\n");
-    fadeInProgress = 8;
-
-    //calculate how far into the ramp we are
-    if(nowseconds > moonStartSecond){secondsIntoRamp = nowseconds - moonStartSecond;}
-    if(nowseconds < moonStartSecond){secondsIntoRamp = nowseconds + (86400 - moonStartSecond);}
-    
-    //calculate currentPWM based on where we are in ramp
-    for (i = 0; i < numCh; i = i + 1) {
-      LEDsettings[i].targetPWM = LEDsettings[i].moonPWM;
-      LEDsettings[i].lastPWM = 0;
-      if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM)
-      {
-        difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);
-        LEDsettings[i].currentPWM = LEDsettings[i].lastPWM + ((difference * secondsIntoRamp) / fadeTimeSeconds);
-      }
-      if(LEDsettings[i].targetPWM < LEDsettings[i].lastPWM)
-      {
-        difference = (LEDsettings[i].lastPWM - LEDsettings[i].targetPWM);
-        LEDsettings[i].currentPWM = LEDsettings[i].lastPWM - ((difference * secondsIntoRamp) / fadeTimeSeconds);
-      }
-    }
-    //start a new ramp beginning at current time using time remaining of ramp
-    fadeStartTimeMillis = millis();
-    fadeStartTimeSeconds = now();
-    tempFadeTimeMillis = (fadeTimeSeconds - secondsIntoRamp)*1000;
-    for (i = 0; i < numCh; i = i + 1) {
-      LEDsettings[i].targetPWM = LEDsettings[i].moonPWM;
-      LEDsettings[i].lastPWM = LEDsettings[i].currentPWM;
-      if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM){difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);}
-      if(LEDsettings[i].targetPWM < LEDsettings[i].lastPWM){difference = (LEDsettings[i].lastPWM - LEDsettings[i].targetPWM);}
-      LEDsettings[i].fadeIncrementTime = tempFadeTimeMillis / difference;
-    }
-  }
-  if(LEDStartMode == 9)
-  {
-    BLYNK_LOG("Setting lights to moonfall mode based on current time...\n");
-    fadeInProgress = 9;
-
-    //calculate how far into the ramp we are
-    if(nowseconds > moonStopSecond){secondsIntoRamp = nowseconds - moonStopSecond;}
-    if(nowseconds < moonStopSecond){secondsIntoRamp = nowseconds + (86400 - moonStopSecond);}
-    
-    //calculate currentPWM based on where we are in ramp
-    for (i = 0; i < numCh; i = i + 1) {
-      LEDsettings[i].targetPWM = 0;
-      LEDsettings[i].lastPWM = LEDsettings[i].moonPWM;
-      if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM)
-      {
-        difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);
-        LEDsettings[i].currentPWM = LEDsettings[i].lastPWM + ((difference * secondsIntoRamp) / fadeTimeSeconds);
-      }
-      if(LEDsettings[i].targetPWM < LEDsettings[i].lastPWM)
-      {
-        difference = (LEDsettings[i].lastPWM - LEDsettings[i].targetPWM);
-        LEDsettings[i].currentPWM = LEDsettings[i].lastPWM - ((difference * secondsIntoRamp) / fadeTimeSeconds);
-      }
-    }
-    //start a new ramp beginning at current time using time remaining of ramp
-    fadeStartTimeMillis = millis();
-    fadeStartTimeSeconds = now();
-    tempFadeTimeMillis = (fadeTimeSeconds - secondsIntoRamp)*1000;
-    for (i = 0; i < numCh; i = i + 1) {
-      LEDsettings[i].targetPWM = 0;
-      LEDsettings[i].lastPWM = LEDsettings[i].currentPWM;
-      if(LEDsettings[i].targetPWM > LEDsettings[i].lastPWM){difference = (LEDsettings[i].targetPWM - LEDsettings[i].lastPWM);}
-      if(LEDsettings[i].targetPWM < LEDsettings[i].lastPWM){difference = (LEDsettings[i].lastPWM - LEDsettings[i].targetPWM);}
-      LEDsettings[i].fadeIncrementTime = tempFadeTimeMillis / difference;
-    }
-  }
+  writeLEDs();
 }
 
 // returns scaling factor for current day in lunar cycle
