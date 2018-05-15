@@ -12,13 +12,13 @@ BLYNK_CONNECTED()
 }
 // This is called when Smartphone App is opened
 BLYNK_APP_CONNECTED() {
-  BLYNK_LOG("App Connected\n");
+  BLYNK_LOG("App Connected");
   appConnected = true;
   if(LEDMode == 1)updateBlynkSliders();
 }
 // This is called when Smartphone App is closed
 BLYNK_APP_DISCONNECTED() {
-  BLYNK_LOG("App Disconnected\n");
+  BLYNK_LOG("App Disconnected");
   appConnected = false;
 }
 BLYNK_WRITE(V0) {// slider widget to set the maximum led level from the Blynk App.
@@ -27,11 +27,12 @@ BLYNK_WRITE(V0) {// slider widget to set the maximum led level from the Blynk Ap
   valueF = valueF * 40.95;
   value = valueF;
   value = constrain(value,0,4095);
-  //if in mode 1 or 2 take new value as tempPWM and set LED to that value for viewing purposes
+  //if in mode 1 or 2 take new value as currentPWM and set LED to that value for viewing purposes
   if((LEDMode == 2)||(LEDMode == 3)||(LEDMode == 4))
   {
     LEDsettings[0].tempPWM = value;
     pwm.setPWM(0, 0, LEDsettings[0].tempPWM);
+    BLYNK_LOG("Setting ch1 current to %d",LEDsettings[0].tempPWM);
   }
 }
 BLYNK_WRITE(V1) {// slider widget to set the maximum led level from the Blynk App.
@@ -44,6 +45,7 @@ BLYNK_WRITE(V1) {// slider widget to set the maximum led level from the Blynk Ap
   {
     LEDsettings[1].tempPWM = value;
     pwm.setPWM(1, 0, LEDsettings[1].tempPWM);
+    BLYNK_LOG("Setting ch2 current to %d",LEDsettings[1].tempPWM);
   }
 }
 BLYNK_WRITE(V2) {// slider widget to set the maximum led level from the Blynk App.
@@ -56,6 +58,7 @@ BLYNK_WRITE(V2) {// slider widget to set the maximum led level from the Blynk Ap
   {
     LEDsettings[2].tempPWM = value;
     pwm.setPWM(2, 0, LEDsettings[2].tempPWM);
+    BLYNK_LOG("Setting ch3 current to %d",LEDsettings[2].tempPWM);
   }
 }
 BLYNK_WRITE(V3) {// slider widget to set the maximum led level from the Blynk App.
@@ -68,6 +71,7 @@ BLYNK_WRITE(V3) {// slider widget to set the maximum led level from the Blynk Ap
   {
     LEDsettings[3].tempPWM = value;
     pwm.setPWM(3, 0, LEDsettings[3].tempPWM);
+    BLYNK_LOG("Setting ch4 current to %d",LEDsettings[3].tempPWM);
   }
 }
 BLYNK_WRITE(V4) {// slider widget to set the maximum led level from the Blynk App.
@@ -80,6 +84,7 @@ BLYNK_WRITE(V4) {// slider widget to set the maximum led level from the Blynk Ap
   {
     LEDsettings[4].tempPWM = value;
     pwm.setPWM(4, 0, LEDsettings[4].tempPWM);
+    BLYNK_LOG("Setting ch5 current to %d",LEDsettings[4].tempPWM);
   }
 }
 BLYNK_WRITE(V5) {// slider widget to set the maximum led level from the Blynk App.
@@ -92,6 +97,7 @@ BLYNK_WRITE(V5) {// slider widget to set the maximum led level from the Blynk Ap
   {
     LEDsettings[5].tempPWM = value;
     pwm.setPWM(5, 0, LEDsettings[5].tempPWM);
+    BLYNK_LOG("Setting ch6 current to %d",LEDsettings[5].tempPWM);
   }
 }
 BLYNK_WRITE(V10) //Blynk pin for sunrise/sunset time (time LEDs start turning on / hit moon values)
@@ -116,9 +122,9 @@ BLYNK_WRITE(V10) //Blynk pin for sunrise/sunset time (time LEDs start turning on
   }
 
   sprintf(Time, "%02d:%02d:%02d", sunriseSecond/3600 , (sunriseSecond / 60) % 60, 0);
-  BLYNK_LOG("Sunrise time is: %s\n",Time);
+  BLYNK_LOG("Sunrise time is: %s",Time);
   sprintf(Time, "%02d:%02d:%02d", sunsetSecond/3600 , (sunsetSecond / 60) % 60, 0);
-  BLYNK_LOG("Sunset time is: %s\n",Time);
+  BLYNK_LOG("Sunset time is: %s",Time);
 }
 BLYNK_WRITE(V11) //Blynk pin for daylight start/stop time
 {
@@ -142,9 +148,9 @@ BLYNK_WRITE(V11) //Blynk pin for daylight start/stop time
   }
   
   sprintf(Time, "%02d:%02d:%02d", startsecond/3600 , ((startsecond / 60) % 60), 0);
-  BLYNK_LOG("Daylight start time is: %s\n",Time);
+  BLYNK_LOG("Daylight start time is: %s",Time);
   sprintf(Time, "%02d:%02d:%02d", stopsecond/3600 , ((stopsecond / 60) % 60), 0);
-  BLYNK_LOG("Daylight stop time is: %s\n",Time);
+  BLYNK_LOG("Daylight stop time is: %s",Time);
 }
 BLYNK_WRITE(V12) // slider widget to set the led fade duration up tp 3 hours.
 {
@@ -152,7 +158,7 @@ BLYNK_WRITE(V12) // slider widget to set the led fade duration up tp 3 hours.
   fadeTimeSeconds = map(value, 0, 180, 60, 10800);      // 1 minute fade duration is minimum
   fadeTimeMillis  = map(value, 0, 180, 60000, 10800000);// 3 hour fade duration is maximum
 
-  BLYNK_LOG("Fade Time in seconds: %d\n",fadeTimeSeconds);
+  BLYNK_LOG("Fade Time in seconds: %d",fadeTimeSeconds);
 }
 BLYNK_WRITE(V13) //Blynk pin for moonlight time
 {
@@ -176,9 +182,9 @@ BLYNK_WRITE(V13) //Blynk pin for moonlight time
   }
 
   sprintf(Time, "%02d:%02d:%02d", moonStartSecond/3600 , (moonStartSecond / 60) % 60, 0);
-  BLYNK_LOG("Moonlight start time is: %s\n",Time);
+  BLYNK_LOG("Moonlight start time is: %s",Time);
   sprintf(Time, "%02d:%02d:%02d", moonStopSecond/3600 , (moonStopSecond / 60) % 60, 0);
-  BLYNK_LOG("Moonlight stop time is: %s\n",Time);
+  BLYNK_LOG("Moonlight stop time is: %s",Time);
 }
 BLYNK_WRITE(V15) {// menu input to select LED mode
   LEDMode = param.asInt();
@@ -191,9 +197,6 @@ BLYNK_WRITE(V15) {// menu input to select LED mode
       //Set LEDs to expected value based on time as long as time is set
       smartLEDStartup();
     }
-    for (i = 0; i < numCh; i = i + 1){
-        LEDsettings[i].tempPWM = LEDsettings[i].currentPWM;
-      }
   }
   if(LEDMode == 2)
   {
@@ -218,31 +221,31 @@ BLYNK_WRITE(V15) {// menu input to select LED mode
   }
   float valueF;
   for (i = 0; i < numCh; i = i + 1)
-    {
-      valueF = (float)LEDsettings[i].tempPWM / (float)40.95;
-      BLYNK_LOG("Channel %d Value: %.1f%\n",i,valueF);
-      switch (i) {
-        case 0:
-          Blynk.virtualWrite(V0, valueF);
-          break;
-        case 1:
-          Blynk.virtualWrite(V1, valueF);
-          break;
-        case 2:
-          Blynk.virtualWrite(V2, valueF);
-          break;
-        case 3:
-          Blynk.virtualWrite(V3, valueF);
-          break;
-        case 4:
-          Blynk.virtualWrite(V4, valueF);
-          break;
-        case 5:
-          Blynk.virtualWrite(V5, valueF);
-          break;
-      }
-      Blynk.run();
+  {
+    valueF = (float)LEDsettings[i].tempPWM / (float)40.95;
+    BLYNK_LOG("Channel %d Value: %.1f",i,valueF);
+    switch (i) {
+      case 0:
+        Blynk.virtualWrite(V0, valueF);
+        break;
+      case 1:
+        Blynk.virtualWrite(V1, valueF);
+        break;
+      case 2:
+        Blynk.virtualWrite(V2, valueF);
+        break;
+      case 3:
+        Blynk.virtualWrite(V3, valueF);
+        break;
+      case 4:
+        Blynk.virtualWrite(V4, valueF);
+        break;
+      case 5:
+        Blynk.virtualWrite(V5, valueF);
+        break;
     }
+    Blynk.run();
+  }
 }
 BLYNK_WRITE(V16) {// Save button for LED settings
   int buttonState = param.asInt();
@@ -276,7 +279,7 @@ void updateBlynkSliders(boolean updateAll)
     for (i = 0; i < numCh; i = i + 1)
     {
       valueF = (float)LEDsettings[i].currentPWM / (float)40.95;
-      BLYNK_LOG("Channel %d Current: %.1f%\n",i,valueF);
+      BLYNK_LOG("Channel %d Current: %.1f%",i,valueF);
       switch (i) {
         case 0:
           Blynk.virtualWrite(V0, valueF);
